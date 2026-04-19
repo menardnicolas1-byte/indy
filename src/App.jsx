@@ -836,6 +836,12 @@ function Annuaire(){
 
 // --- SUBVENTIONS --------------------------------------------------------------
 function Subventions({plan,goPlan}){
+  const [ans,setAns]=useState({});
+  const [qi,setQi]=useState(0);
+  const [phase,setPhase]=useState("q");
+  const [exp,setExp]=useState(null);
+  const [showD,setShowD]=useState(false);
+  const [selD,setSelD]=useState(null);
   if(plan==="free"){
     return(
       <div style={{minHeight:"100vh",background:"#080808",color:"#F0EDE8",fontFamily:"'Inter',sans-serif",paddingBottom:80}}>
@@ -844,7 +850,6 @@ function Subventions({plan,goPlan}){
       </div>
     );
   }
-  const [ans,setAns]=useState({});const [qi,setQi]=useState(0);const [phase,setPhase]=useState("q");const [exp,setExp]=useState(null);const [showD,setShowD]=useState(false);const [selD,setSelD]=useState(null);
   const answer=(qid,val)=>{const n={...ans,[qid]:val};setAns(n);if(qi<FINANCEMENT_QS.length-1)setTimeout(()=>setQi(qi+1),280);};
   const allDone=Object.keys(ans).length===FINANCEMENT_QS.length;
   const results=AIDES.map(a=>({...a,score:scoreAide(a,ans)})).filter(a=>a.score>=40).sort((a,b)=>b.score-a.score);
