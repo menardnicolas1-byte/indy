@@ -1479,6 +1479,7 @@ function PressKit({projects,plan,goPlan}){
     );
   }
   const gen=async()=>{
+    if(plan==="free"){goPlan();return;}
     if(left<=0){goPlan();return;}setPhase("loading");
     const d=data;const P={court:`Bio courte ~100 mots, accrocheur, réseaux. FR.\nArtiste:${d.nom}\nGenre:${d.genre}\nVille:${d.ville||"France"}\nInfluences:${d.influences||""}\nProjet:${d.titre||""}\nPoints forts:${d.acc||""}`,long:`Bio longue ~300 mots, journalistique, médias/booking. FR.\nArtiste:${d.nom}\nGenre:${d.genre}\nInfluences:${d.influences||""}\nProjet:${d.titre||""}\nPoints forts:${d.acc||""}`,email:`Email booking 150-200 mots, direct, pro. FR.\nArtiste:${d.nom}\nGenre:${d.genre}\nPoints forts:${d.acc||""}\nContact:${d.contact||""}`,spotify:`Pitch Spotify éditorial ~150 mots. FR.\nArtiste:${d.nom}\nGenre:${d.genre}\nProjet:${d.titre||""}\nPoints forts:${d.acc||""}`};
     try{const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-haiku-4-5-20251001",max_tokens:1000,system:AI_SYSTEM,messages:[{role:"user",content:P[fmt]}]})});const json=await res.json();setResult(json.content?.map(b=>b.text||"").join("")||"Erreur.");setLeft(l=>l-1);}catch{setResult("Erreur de connexion.");}setPhase("result");
@@ -1981,8 +1982,14 @@ function Reseau({user}){
 }
 
 // --- ACTUALITÉS ---------------------------------------------------------------
-function Actualites(){
+function Actualites({plan,goPlan}){
   const [loading,setLoading]=useState(false);const [articles,setArticles]=useState(null);const [query,setQuery]=useState("");const [searched,setSearched]=useState(false);
+  if(plan==="free")return(
+    <div style={{minHeight:"100vh",background:"#080808",color:"#F0EDE8",fontFamily:"'Inter',sans-serif",paddingBottom:80}}>
+      <Hdr sub="ACTUALITES" accent="#74C0FC"/>
+      <Gate onUpgrade={goPlan} label="Acces aux actualites musicales en temps reel  -  concours, festivals, appels a projets, jams." features={["Concours et appels a projets","Festivals independants","Jams sessions","Actualites subventions","Recherche personnalisee"]}/>
+    </div>
+  );
   const CATS=[{l:"Concours de chant",q:"concours chant France 2025"},{l:"Jams sessions",q:"jam session Paris Lyon Marseille 2025"},{l:"Festivals",q:"festival musique indépendant France 2025"},{l:"Appels à projets",q:"appel à projets musique culture 2025"},{l:"Actualité indé",q:"artiste indépendant musique France actualité"},{l:"Subventions",q:"subvention musique artiste 2025 CNM"}];
   const search=async(q)=>{
     setLoading(true);setSearched(true);setQuery(q);
@@ -2033,7 +2040,7 @@ function Profil({plan,setPlan,user,goPlan}){
         <div className="card" style={{padding:18}}><div style={{fontSize:11,color:"#AAA",letterSpacing:1,fontWeight:600,marginBottom:10}}>PROFIL ARTISTE</div><div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,letterSpacing:3}}>{user?.name||"Artiste"}</div><div style={{fontSize:11,color:"#555",marginTop:2}}>{user?.genre||"Genre non défini"}</div></div>
         <div className="card" style={{padding:18,borderColor:`${cur.c}22`}}><div style={{fontSize:11,color:"#AAA",letterSpacing:1,fontWeight:600,marginBottom:10}}>PLAN ACTUEL</div><div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><div><div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,letterSpacing:3,color:cur.c}}>{cur.l}</div><div style={{fontSize:10,color:"#999",marginTop:2}}>{plan==="free"?"Essai 3 jours gratuits":plan==="artiste"?"9,90€ / mois  -  Fondateur":"29,90€ / mois  -  Fondateur"}</div></div><div style={{width:12,height:12,borderRadius:"50%",background:cur.c}}/></div>{plan!=="label"&&<button className="btn" style={{marginTop:14}} onClick={goPlan}>{plan==="free"?"Passer Pro →":"Passer Label →"}</button>}</div>
         <div style={{background:"#0A1A0A",border:"1px solid #00C9A722",borderRadius:8,padding:"12px 14px",fontSize:11,color:"#00C9A7",lineHeight:1.8}}><div style={{fontSize:9,letterSpacing:2,marginBottom:6}}>🧪 MODE TEST STRIPE</div><div style={{color:"#888",fontSize:11}}>Activez avec votre SIRET sur stripe.com.</div><div style={{marginTop:8,fontSize:10,color:"#00C9A755"}}>CB test : <strong>4242 4242 4242 4242</strong> · 12/26 · 123</div></div>
-        <div className="card" style={{padding:16}}><div style={{fontSize:11,color:"#AAA",letterSpacing:1,fontWeight:600,marginBottom:12}}>SIMULER UN PLAN (DEMO)</div><div style={{display:"flex",gap:8}}>{["free","artiste","label"].map(p=><button key={p} onClick={()=>setPlan(p)} style={{flex:1,background:plan===p?"#FF6B3515":"#111",border:`1px solid ${plan===p?"#FF6B35":"#1A1A1A"}`,color:plan===p?"#FF6B35":"#555",fontFamily:"'Inter',sans-serif",fontSize:9,letterSpacing:1,padding:"8px",borderRadius:6,cursor:"pointer",textTransform:"uppercase"}}>{p}</button>)}</div></div>
+
       </div>
     </div>
   );
@@ -2048,7 +2055,7 @@ function Chatbot({plan,onUpgrade,onClose}){
   const [loading,setLoading]=useState(false);
 
   const send=async()=>{
-    if(!input.trim()||loading)return;
+    if(plan==="free"||!input.trim()||loading)return;
     const userMsg={role:"user",content:input.trim()};
     setMsgs(prev=>[...prev,userMsg]);setInput("");setLoading(true);
     try{
@@ -2155,7 +2162,7 @@ export default function INDYComplete() {
         {view==="bibliotheque"&&<Bibliotheque plan={plan} goPlan={goPlan}/>}
         {view==="annuaire"   &&<Annuaire/>}
         {view==="reseau"     &&<Reseau user={user}/>}
-        {view==="actualites" &&<Actualites/>}
+        {view==="actualites" &&<Actualites plan={plan} goPlan={goPlan}/>}
         {view==="profil"     &&<Profil plan={plan} setPlan={setPlan} user={user} goPlan={goPlan}/>}
       </div>
 
@@ -2175,8 +2182,8 @@ export default function INDYComplete() {
 
       {/* Chatbot bouton flottant */}
       {!showChat&&(
-        <button onClick={()=>plan!=="free"&&setShowChat(true)} style={{position:"fixed",bottom:76,right:16,width:52,height:52,borderRadius:"50%",background:plan!=="free"?"#FF6B35":"#1A1A1A",border:plan!=="free"?"none":"2px solid #2A2A2A",color:plan!=="free"?"#000":"#333",fontSize:22,cursor:plan!=="free"?"pointer":"not-allowed",display:"flex",alignItems:"center",justifyContent:"center",zIndex:49,boxShadow:plan!=="free"?"0 4px 20px #FF6B3544":"none",transition:"all 0.3s",opacity:plan!=="free"?1:0.3}}>
-          💬
+        <button onClick={()=>plan==="free"?goPlan():setShowChat(true)} style={{position:"fixed",bottom:76,right:16,width:52,height:52,borderRadius:"50%",background:plan!=="free"?"#FF6B35":"#1A1A1A",border:plan!=="free"?"none":"2px solid #FF6B3544",color:plan!=="free"?"#000":"#555",fontSize:22,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:49,boxShadow:plan!=="free"?"0 4px 20px #FF6B3544":"none",transition:"all 0.3s",opacity:plan!=="free"?1:0.4}}>
+          {plan==="free"?"🔒":"💬"}
         </button>
       )}
 
