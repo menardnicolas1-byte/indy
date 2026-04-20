@@ -1,7 +1,17 @@
 import { useState } from "react";
 
 // --- CONFIG ------------------------------------------------------------------
-const PRICES = { artiste: "price_ARTISTE_499", label: "price_LABEL_2499" };
+// 200 fondateurs max — TODO: brancher sur Supabase COUNT(users WHERE plan != 'free')
+const MEMBER_COUNT = 47;
+const IS_FONDATEUR = MEMBER_COUNT < 200;
+
+const PRICES = {
+  artiste_fondateur: "price_1TODOE0aQuevE1QtePnpoIz6",
+  artiste_standard:  "price_1TODOG0aQuevE1QtMpBThg5S",
+  label_fondateur:   "price_1TODOI0aQuevE1Qtr1kCGHb3",
+  label_standard:    "price_1TODOL0aQuevE1QtRrMdgkyc",
+  label_artiste_supp:"price_1TODTy0aQuevE1QtQfoGQHUl",
+};
 const AFF = {
   distrokid: "https://distrokid.com/vip/seven/TONCODE",
   tunecore:  "https://www.tunecore.com/?ref=TONCODE",
@@ -79,9 +89,9 @@ const INIT_PROJECTS = [
   {id:4,titre:"Kongolio",artiste:"Papi Koné",genre:"Afrobeats",stage:"promotion",sortie:"2025-05-20",urgent:"Contenu TikTok J-3",color:"#FFD43B",progress:{creation:100,protection:100,distribution:100,promotion:50,financement:20,live:10},checks:{c1:true,c2:true,c3:true,c4:true,c5:true,p1:true,p2:true,p3:true,p4:true,p5:true,d1:true,d2:true,d3:true,d4:true,d5:true,pr1:true,pr2:true,pr3:true}},
 ];
 const PLANS = [
-  {id:"free",name:"ESSAI 3 JOURS",price:"0€",period:"",color:"#999",features:["Dashboard + Coach parcours","Annuaire en lecture","Accès limité 3 jours"],locked:["Press Kit IA","Module Booking & email IA","Matching subventions complet","Bibliothèque documents","💬 Chatbot IA coach"],cta:"Commencer l'essai 3 jours"},
-  {id:"artiste",name:"ARTISTE",price:"9,99€",priceFutur:"14,99€",period:"/mois",color:"#FF6B35",badge:"FONDATEUR",features:["Titres illimités","Press Kit IA illimité","Module Booking + email IA","Matching subventions complet","Bibliothèque 12+ documents","💬 Chatbot IA coach personnel"],locked:["Multi-artistes","Vue label globale"],cta:"Devenir INDY Artiste",priceId:PRICES.artiste},
-  {id:"label",name:"STUDIO / LABEL",price:"29,90€",priceFutur:"34,90€",period:"/mois",color:"#C8A96E",badge:"FONDATEUR",labelInfo:"5 artistes inclus · +4,99€/artiste · max 20",features:["Tout du plan Artiste","5 artistes inclus","+4,99€ par artiste supplémentaire","Vue globale label","Export tous documents","💬 Chatbot IA coach personnel","Support prioritaire"],locked:[],cta:"Passer en mode Label",priceId:PRICES.label},
+  {id:"free",name:"ESSAI 3 JOURS",price:"0€",period:"",color:"#999",features:["Dashboard + Coach parcours","Annuaire en lecture","Accès limité 3 jours"],locked:["Press Kit IA","Module Booking & email IA","Matching subventions complet","Bibliothèque documents","💬 Chatbot IA coach"],cta:"Commencer l'essai gratuit"},
+  {id:"artiste",name:"ARTISTE",price:IS_FONDATEUR?"9,90€":"14,90€",priceFutur:IS_FONDATEUR?"puis 14,90€":null,period:"/mois",color:"#FF6B35",badge:IS_FONDATEUR?"FONDATEUR":null,features:["Titres illimités","Press Kit IA illimité","Module Booking + email IA","Matching subventions complet","Bibliothèque 20+ documents","Split sheet & contrat featuring","💬 Chatbot IA coach personnel","Rappels & relances auto"],locked:["Multi-artistes","Vue label globale","Contrats cession / co-prod / licence","Rider & fiche technique"],cta:"Devenir INDY Artiste",priceId:IS_FONDATEUR?PRICES.artiste_fondateur:PRICES.artiste_standard},
+  {id:"label",name:"STUDIO / LABEL",price:IS_FONDATEUR?"29,90€":"34,90€",priceFutur:IS_FONDATEUR?"puis 34,90€":null,period:"/mois",color:"#C8A96E",badge:IS_FONDATEUR?"FONDATEUR":null,labelInfo:"5 artistes inclus · +4,90€/artiste · max 20",features:["Tout du plan Artiste","5 artistes inclus","+4,90€ par artiste supplémentaire","Bibliothèque 24 docs complète","Tous les contrats (cession, co-prod, licence, management)","Template rider & fiche technique","Vue globale label","💬 Chatbot IA coach personnel","Support prioritaire"],locked:[],cta:"Passer en mode Label",priceId:IS_FONDATEUR?PRICES.label_fondateur:PRICES.label_standard},
 ];
 
 // --- SALLES -------------------------------------------------------------------
@@ -200,6 +210,903 @@ const FINANCEMENT_QS = [
   {id:"budget",q:"Budget estimé ?",opts:[{v:"petit",l:"< 3 000 €"},{v:"moyen",l:"3k–15k €"},{v:"grand",l:"15k–50k €"},{v:"xl",l:"> 50 000 €"}]},
 ];
 function scoreAide(a,ans){let s=0,m=0;m+=3;if(ans.statut&&a.statuts.includes(ans.statut))s+=3;m+=4;if(ans.projet&&a.projets.includes(ans.projet))s+=4;m+=2;if(a.sacem){if(ans.sacem==="oui")s+=2;}else s+=2;m+=2;if(ans.budget&&a.budgets.includes(ans.budget))s+=2;return Math.round(s/m*100);}
+
+
+// --- BIBLIOTHÈQUE DOCS -------------------------------------------------------
+const BIBLIO_CATS = [
+  {id:"contrats",   label:"Contrats & Accords",     icon:"📜", color:"#FF6B35"},
+  {id:"sacem",      label:"SACEM & Droits",           icon:"🎵", color:"#845EF7"},
+  {id:"distrib",    label:"Distribution & Promotion", icon:"🚀", color:"#1DB954"},
+  {id:"finance",    label:"Financements & Aides",     icon:"💰", color:"#F03E3E"},
+  {id:"statuts",    label:"Statuts Juridiques",        icon:"📋", color:"#00C9A7"},
+  {id:"live",       label:"Live & Technique",          icon:"🎤", color:"#FFD43B"},
+];
+// access: "all"=artiste+label | "label"=label seulement
+const BIBLIO_DOCS = [
+  // ── CONTRATS ──
+  {id:"feat",cat:"contrats",icon:"🤝",titre:"Contrat de Featuring",access:"all",
+   resume:"Encadre la participation d'un artiste invité — droits, rémunération, crédits.",
+   contenu:`CONTRAT DE FEATURING
+
+Entre :
+L'ARTISTE PRINCIPAL : [Nom / Scène], né(e) le [date], demeurant [adresse]
+L'ARTISTE INVITÉ : [Nom / Scène], né(e) le [date], demeurant [adresse]
+
+ARTICLE 1 – OBJET
+L'Artiste Invité participe en qualité d'interprète au titre "[Titre]", d'une durée de [XX:XX], produit par [Producteur].
+
+ARTICLE 2 – DROITS D'AUTEUR
+Répartition des droits :
+• Composition : Principal [XX]% / Invité [XX]%
+• Paroles : Principal [XX]% / Invité [XX]%
+Chaque partie s'engage à déclarer sa part à la SACEM.
+
+ARTICLE 3 – DROITS VOISINS
+• Artiste Principal : [XX]%
+• Artiste Invité : [XX]%
+
+ARTICLE 4 – RÉMUNÉRATION
+[ ] Cachet fixe : [XX] € à la signature
+[ ] Partage recettes : [XX]% des recettes nettes
+[ ] Gratuité convenue entre les parties
+
+ARTICLE 5 – EXPLOITATION
+L'Artiste Principal peut exploiter l'enregistrement sous toutes formes (streaming, téléchargement, sync, physique) pour [X] ans / durée légale, sur le territoire [France / Monde].
+
+ARTICLE 6 – CRÉDITS
+L'Artiste Invité sera crédité sous le nom "[Nom de scène]" sur tous supports.
+
+ARTICLE 7 – DROIT APPLICABLE
+Droit français. Tout litige devant les tribunaux de [Ville].
+
+Fait à [Ville], le [Date]
+
+Signature Artiste Principal :          Signature Artiste Invité :`},
+
+  {id:"split",cat:"contrats",icon:"📊",titre:"Split Sheet — Répartition des droits",access:"all",
+   resume:"Document de référence pour fixer la répartition entre co-auteurs. À signer avant toute diffusion.",
+   contenu:`SPLIT SHEET — RÉPARTITION DES DROITS
+
+Titre : [Nom du titre]
+Date de création : [Date]
+ISRC (si dispo) : [Code]
+Durée : [XX:XX]
+
+DROITS D'AUTEUR
+────────────────────────────────────────
+Nom / Scène       | Rôle         | Compo | Paroles | SACEM
+[Nom 1]           | Compositeur  | [XX]% | [XX]%   | Oui/Non
+[Nom 2]           | Parolier     | [XX]% | [XX]%   | Oui/Non
+[Nom 3]           | Co-prod      | [XX]% | [XX]%   | Oui/Non
+TOTAL             |              | 100%  | 100%    |
+
+DROITS VOISINS (Interprètes)
+────────────────────────────────────────
+Nom / Scène       | Rôle         | Part
+[Nom 1]           | Artiste ppal | [XX]%
+[Nom 2]           | Featuring    | [XX]%
+TOTAL             |              | 100%
+
+⚠️ Ce document vaut accord entre les parties.
+Chacun s'engage à déclarer sa part à la SACEM avant diffusion.
+
+Signatures :
+[Nom 1] — Date — Signature :
+[Nom 2] — Date — Signature :`},
+
+  {id:"cession",cat:"contrats",icon:"📜",titre:"Contrat de Cession de Droits Voisins",access:"label",
+   resume:"Cède les droits d'interprétation à un producteur/label en échange d'un cachet ou royalties.",
+   contenu:`CONTRAT DE CESSION DE DROITS VOISINS
+
+Entre :
+LE PRODUCTEUR : [Raison sociale], SIRET [XXXXXXX], représenté par [Nom]
+L'ARTISTE : [Nom / Scène], né(e) le [date], demeurant [adresse]
+
+ARTICLE 1 – OBJET
+L'Artiste cède au Producteur, à titre exclusif, ses droits voisins sur l'enregistrement du titre "[Titre]".
+
+ARTICLE 2 – DROITS CÉDÉS
+• Droit de reproduction (streaming, téléchargement, pressage physique)
+• Droit de communication au public (radio, TV, sync)
+• Droit de distribution sous toutes formes
+• Droit d'adaptation/remix (avec accord préalable écrit)
+
+ARTICLE 3 – DURÉE ET TERRITOIRE
+[X] ans / durée légale, sur le territoire [France / UE / Monde].
+
+ARTICLE 4 – RÉMUNÉRATION
+[ ] Cachet forfaitaire : [XX] € à la signature
+[ ] Royalties : [XX]% des recettes nettes, versées semestriellement
+[ ] Avance : [XX] € récupérable sur premières recettes
+
+ARTICLE 5 – DROITS MORAUX
+L'Artiste conserve ses droits moraux. Crédité sous "[Nom de scène]".
+
+Fait à [Ville], le [Date]
+Producteur :                    Artiste :`},
+
+  {id:"coprod",cat:"contrats",icon:"🎛️",titre:"Contrat de Co-production Musicale",access:"label",
+   resume:"Définit droits et obligations de deux producteurs qui co-financent un enregistrement.",
+   contenu:`CONTRAT DE CO-PRODUCTION MUSICALE
+
+Entre :
+PRODUCTEUR A : [Raison sociale], SIRET [XXXXXXX], représenté par [Nom]
+PRODUCTEUR B : [Raison sociale], SIRET [XXXXXXX], représenté par [Nom]
+
+ARTICLE 1 – OBJET
+Co-production de l'enregistrement "[Titre]" interprété par [Artiste].
+
+ARTICLE 2 – APPORTS
+Producteur A : [Budget XX€ / Studios / Promotion]
+Producteur B : [Budget XX€ / Distribution / Marketing]
+
+ARTICLE 3 – RÉPARTITION
+Droits de producteur phonographique :
+• Producteur A : [XX]%
+• Producteur B : [XX]%
+Applicable à toutes les recettes d'exploitation.
+
+ARTICLE 4 – EXPLOITATION
+Décisions conjointes. En cas de désaccord : voix prépondérante du Producteur A.
+
+ARTICLE 5 – REVERSEMENTS
+Compte de gestion tenu par [A/B]. Reversements trimestriels après déduction des frais justifiés.
+
+Fait à [Ville], le [Date]
+Producteur A :                  Producteur B :`},
+
+  {id:"licence_excl",cat:"contrats",icon:"🔐",titre:"Contrat de Licence Exclusive",access:"label",
+   resume:"Accorde à un tiers le droit exclusif d'exploiter un enregistrement sur un territoire donné.",
+   contenu:`CONTRAT DE LICENCE EXCLUSIVE
+
+Entre :
+LE CONCÉDANT : [Nom], titulaire des droits
+LE LICENCIÉ : [Nom / Raison sociale]
+
+ARTICLE 1 – EXCLUSIVITÉ ET TERRITOIRE
+Licence exclusive sur : [France / Europe / Monde]
+Durée : [X] ans. Le Concédant s'interdit tout droit similaire à un tiers sur ce territoire.
+
+ARTICLE 2 – DROITS ACCORDÉS
+• Streaming et téléchargement
+• Diffusion radio et TV
+• Synchronisation (accord écrit préalable requis)
+• Distribution physique
+
+ARTICLE 3 – RÉMUNÉRATION
+Avance non récupérable : [XX] €
+Royalties : [XX]% des recettes nettes, semestriellement avec relevé détaillé.
+
+ARTICLE 4 – FIN
+À l'expiration, tous droits retournent au Concédant. Stocks physiques écoulables sous 6 mois.
+
+Fait à [Ville], le [Date]
+Concédant :                     Licencié :`},
+
+  {id:"licence_ne",cat:"contrats",icon:"🔓",titre:"Contrat de Licence Non-Exclusive",access:"label",
+   resume:"Autorise plusieurs licenciés à exploiter simultanément le même enregistrement.",
+   contenu:`CONTRAT DE LICENCE NON-EXCLUSIVE
+
+Entre :
+LE CONCÉDANT : [Nom], titulaire des droits
+LE LICENCIÉ : [Nom / Raison sociale]
+
+ARTICLE 1 – NON-EXCLUSIVITÉ
+Le Concédant peut concéder des licences similaires à d'autres tiers simultanément.
+
+ARTICLE 2 – DROITS ET TERRITOIRE
+Droits : [Streaming / Téléchargement / Sync / Radio — préciser]
+Territoire : [France / Europe / Monde]
+Durée : [X] ans
+
+ARTICLE 3 – RÉMUNÉRATION
+[ ] Redevance forfaitaire : [XX] €
+[ ] Royalties : [XX]% des recettes nettes
+
+ARTICLE 4 – CRÉDITS
+"[Titre] — © [Année] [Nom Concédant]"
+
+Fait à [Ville], le [Date]
+Concédant :                     Licencié :`},
+
+  {id:"management",cat:"contrats",icon:"👔",titre:"Contrat de Management Artiste",access:"label",
+   resume:"Définit la mission et la rémunération du manager qui développe la carrière d'un artiste.",
+   contenu:`CONTRAT DE MANAGEMENT ARTISTE
+
+Entre :
+L'ARTISTE : [Nom / Scène]
+LE MANAGER : [Nom / Raison sociale], SIRET [XXXXXXX]
+
+ARTICLE 1 – MISSION
+• Conseil stratégique et orientation de carrière
+• Négociation et suivi des contrats (disque, booking, partenariats)
+• Coordination des équipes (label, agent, attaché de presse)
+• Développement des partenariats et opportunités
+
+ARTICLE 2 – EXCLUSIVITÉ
+Contrat exclusif. L'Artiste s'interdit tout autre manager pendant la durée.
+
+ARTICLE 3 – DURÉE
+[X] an(s), renouvelable par accord exprès.
+
+ARTICLE 4 – COMMISSION
+[15-20]% sur : cachets concerts, avances & royalties disque, sync, revenus publicitaires.
+Exclus : remboursements frais techniques, aides publiques (CNM, ADAMI).
+
+ARTICLE 5 – RÉSILIATION
+Préavis [3] mois. Résiliation anticipée par l'Artiste : le Manager conserve ses commissions sur contrats signés pendant 12 mois post-résiliation.
+
+Fait à [Ville], le [Date]
+L'Artiste :                     Le Manager :`},
+
+  {id:"booking_contrat",cat:"contrats",icon:"🎤",titre:"Contrat de Cession de Spectacle",access:"label",
+   resume:"Encadre la relation producteur / salle pour un concert — cachet, conditions techniques, annulation.",
+   contenu:`CONTRAT DE CESSION DE SPECTACLE
+
+Entre :
+LE PRODUCTEUR : [Nom], licence entrepreneur de spectacle n° [XXXXXX]
+L'ACHETEUR : [Salle / Association], SIRET [XXXXXXX]
+
+ARTICLE 1 – SPECTACLE
+Date : [Jour, Date] — Heure : [HH:MM]
+Lieu : [Salle, Adresse]
+Durée : [XX minutes]
+
+ARTICLE 2 – RÉMUNÉRATION
+[ ] Cachet fixe : [XXXX] € HT
+[ ] Minimum garanti [XXXX] € + [XX]% recettes nettes billetterie au-delà de [XXXX] €
+Paiement : [50]% à la signature, [50]% le soir de la représentation.
+
+ARTICLE 3 – CONDITIONS TECHNIQUES
+L'Acheteur fournit les équipements de la fiche technique annexée.
+Hébergement et restauration de [X] personnes pris en charge.
+
+ARTICLE 4 – DROITS SACEM/SPRE
+L'Acheteur s'acquitte directement de tous droits SACEM, SPRE et taxes.
+
+ARTICLE 5 – ANNULATION
+Par l'Acheteur à moins de 30 jours : [XX]% du cachet dû.
+Par le Producteur (hors force majeure) : remboursement intégral des acomptes.
+
+Fait à [Ville], le [Date]
+Producteur :                    Acheteur :`},
+
+  // ── SACEM & DROITS ──
+  {id:"decla_sacem",cat:"sacem",icon:"🎵",titre:"Fiche déclaration d'œuvre SACEM",access:"all",
+   resume:"Tout ce qu'il faut renseigner pour déclarer correctement une œuvre à la SACEM avant diffusion.",
+   contenu:`FICHE DÉCLARATION D'ŒUVRE SACEM
+
+⚠️ À déposer AVANT toute diffusion ou distribution.
+
+━━━ INFOS SUR L'ŒUVRE ━━━
+Titre exact : ________________________________
+Durée (mm:ss) : ______________
+Type : [ ] Originale  [ ] Arrangement  [ ] Adaptation
+Genre : ________________________________
+ISRC (si dispo) : ________________________________
+
+━━━ AUTEURS & COMPOSITEURS ━━━
+Pour chaque contributeur :
+→ Nom civil complet
+→ Pseudonyme
+→ N° sociétaire SACEM
+→ Rôle : Compositeur / Auteur / Auteur-Compositeur / Arrangeur
+→ Part composition (%) | Part texte (%)
+
+Exemple :
+DUPONT Marie | SAYA | N°123456 | Auteur-Compositeur | 50% | 100%
+
+TOTAL COMPOSITION : 100%
+TOTAL TEXTE : 100%
+
+━━━ ÉDITEUR (si applicable) ━━━
+Raison sociale : ________________
+N° SACEM : ________________
+Part : _______%
+
+━━━ CHECKLIST ━━━
+[ ] Membre SACEM (ou démarche simultanée)
+[ ] Split sheet signé par tous les co-auteurs
+[ ] Parts = 100% en compo ET en texte
+[ ] Dépôt AVANT mise en ligne
+[ ] ISRC noté si titre déjà distribué
+
+💡 Dépôt via espaceclient.sacem.fr > Mes œuvres > Déclarer une œuvre`},
+
+  {id:"isrc",cat:"sacem",icon:"🔢",titre:"Guide obtention code ISRC",access:"all",
+   resume:"L'ISRC identifie chaque enregistrement de façon unique. Obligatoire pour le streaming et les droits voisins.",
+   contenu:`GUIDE OBTENTION CODE ISRC
+
+Format : [Pays][Propriétaire][Année][ID] — ex: FR-Z03-25-00001
+
+Pourquoi c'est indispensable :
+✓ Distribution Spotify, Apple Music, Deezer...
+✓ Perception droits voisins (SCPP / SPPF)
+✓ Suivi diffusions radio et TV
+✓ Identification bases internationales
+
+━━━ 3 FAÇONS D'OBTENIR UN ISRC ━━━
+
+1. Via ton distributeur (le plus simple)
+DistroKid, TuneCore, Believe, CD Baby attribuent automatiquement. GRATUIT.
+→ Récupère-le dans ton dashboard après soumission.
+
+2. Via la SCPP (si tu es producteur avec SIRET)
+Préfixe propre à ton label.
+→ scpp.fr > Espace membres > Codes ISRC
+→ Gratuit pour les membres
+
+3. Via la SPPF
+→ sppf.com | Réservé aux membres
+
+━━━ BONNES PRATIQUES ━━━
+→ 1 ISRC = 1 enregistrement unique
+→ Remix ou live = nouvel ISRC
+→ Ne jamais réutiliser un ISRC
+→ Tiens un fichier : artiste / titre / ISRC / date
+→ Déclare l'ISRC dans ta fiche SACEM
+
+💡 Utilise DistroKid : il attribue l'ISRC auto et tu le récupères avant la mise en ligne.`},
+
+  {id:"guide_sacem",cat:"sacem",icon:"📖",titre:"Guide adhésion SACEM pas à pas",access:"all",
+   resume:"Comment devenir membre SACEM et commencer à percevoir tes droits d'auteur.",
+   contenu:`GUIDE ADHÉSION SACEM
+
+━━━ PRÉREQUIS ━━━
+→ Avoir composé ou écrit au moins 2 titres
+→ Ces titres doivent être diffusés ou diffusables
+
+━━━ ÉTAPES ━━━
+
+1. Crée ton compte sur espaceclient.sacem.fr
+   → Rubrique "Rejoindre la SACEM"
+
+2. Remplis le dossier d'adhésion
+   → Identité civile complète
+   → Nom de scène (si différent)
+   → Coordonnées bancaires (IBAN)
+
+3. Déclare tes 2 premières œuvres
+   → Titre exact, durée, co-auteurs et leurs parts
+   → ISRC si disponible
+
+4. Règle les frais d'adhésion
+   → ~50€ remboursés dès les premiers droits perçus
+
+5. Validation par le comité
+   → Délai : 2 à 4 semaines
+
+━━━ APRÈS L'ADHÉSION ━━━
+→ Déclare chaque nouvelle œuvre AVANT sa diffusion
+→ Droits versés 2x/an (printemps + automne)
+→ Accès à des aides : Bourse Création, aide numérique, résidences
+
+💡 Plus tu déclares tôt, plus tu perçois. La SACEM perçoit sur toutes les diffusions — radio, streaming, concerts, TV, restaurants...`},
+
+  // ── DISTRIBUTION & PROMOTION ──
+  {id:"presskit",cat:"distrib",icon:"✍️",titre:"Template Press Kit Complet",access:"all",
+   resume:"Structure complète pour rédiger un press kit pro : bio courte, bio longue, éléments visuels.",
+   contenu:`TEMPLATE PRESS KIT — [NOM D'ARTISTE]
+
+━━━ BIO COURTE (~100 mots — réseaux, playlists, booking) ━━━
+[NOM] est un(e) artiste [genre] basé(e) à [ville]. Avec [X] titres en [période], il/elle s'impose comme une voix incontournable de la scène [genre] française. Son univers mêle [influence 1], [influence 2] et [influence 3], pour une musique [adj 1] et [adj 2]. [Titre phare] a cumulé [XX]K streams et a été diffusé sur [radio/playlist]. Représenté(e) par [Manager/Label si applicable].
+
+━━━ BIO LONGUE (~300 mots — presse, financements) ━━━
+ORIGINES & INFLUENCES
+[Ville d'origine, comment la musique est arrivée, 2-3 influences avec anecdote personnelle]
+
+TRAJECTOIRE
+[Premiers pas, première sortie, évolution du son, moments clés]
+
+PROJET ACTUEL
+[EP/Album/Tournée — concept, différenciation, ambitions]
+
+CHIFFRES CLÉS
+• [X]K streams cumulés
+• [X] dates en [année]
+• Diffusé sur [radio/playlist Spotify]
+• [Autre accomplissement]
+
+━━━ ÉLÉMENTS VISUELS ━━━
+Photos HD : [Lien Dropbox/Drive]
+Format : JPG, 300 DPI min, 3000px côté court
+Légende : [Nom artiste] — Photo © [Photographe] — [Année]
+
+Logo : [Lien] | Couleurs : [Hex] | Typo : [Police]
+
+━━━ LIENS ━━━
+Spotify : [URL] | Instagram : [URL]
+Smart Link : [URL] | EPK en ligne : [URL]
+
+━━━ REVUE DE PRESSE ━━━
+"[Citation courte]" — [Source], [Date]`},
+
+  {id:"checklist",cat:"distrib",icon:"📋",titre:"Checklist Sortie J-60 à J+30",access:"all",
+   resume:"Planning complet pour préparer et maximiser une sortie musicale.",
+   contenu:`CHECKLIST SORTIE MUSICALE
+
+━━━ J-60 : FONDATIONS ━━━
+[ ] Master finalisé (-14 LUFS intégrés)
+[ ] Artwork 3000x3000px validé (JPG/PNG, RVB)
+[ ] ISRC attribué
+[ ] Œuvre déposée SACEM
+[ ] Split sheet signé
+[ ] Contrat featuring signé (si applicable)
+[ ] Budget promo défini
+
+━━━ J-45 : DISTRIBUTION ━━━
+[ ] Titre soumis au distributeur
+[ ] Metadata complètes (titre, artiste, genre, copyright, ISRC)
+[ ] Date de sortie confirmée
+[ ] Pitch éditorial Spotify envoyé (Spotify for Artists > Pitcher un titre)
+[ ] Smart link créé (Linktree, Linkfire, Beacons)
+
+━━━ J-30 : PROMOTION ━━━
+[ ] Press kit mis à jour et envoyé
+[ ] Blogs musicaux contactés (15-20 contacts)
+[ ] Playlists indépendantes démarchées (Groover ou direct)
+[ ] Radios ciblées contactées
+[ ] Contenu TikTok/Reels prêt (3-5 vidéos)
+[ ] Teaser visuel monté
+
+━━━ J-7 : DERNIÈRE LIGNE ━━━
+[ ] Pré-saves activés
+[ ] Relance presse + playlists avec smart link
+[ ] Plan de posts semaine 1 validé
+[ ] Communauté prévenue (newsletter, story)
+
+━━━ J-0 : SORTIE ━━━
+[ ] Post sur tous les réseaux
+[ ] Story Instagram avec lien
+[ ] TikTok/Reels publié
+[ ] Partage communautés musicales
+
+━━━ J+7 À J+30 : AFTER ━━━
+[ ] J+3 : Relance presse
+[ ] J+7 : Bilan streaming (Spotify for Artists)
+[ ] J+14 : Relance playlists avec stats
+[ ] J+30 : Bilan global
+[ ] Planifier prochaine sortie`},
+
+  {id:"pitch_spotify",cat:"distrib",icon:"🎧",titre:"Template Pitch Éditorial Spotify",access:"all",
+   resume:"Comment remplir le pitch Spotify for Artists pour maximiser tes chances de playlist éditoriale.",
+   contenu:`TEMPLATE PITCH ÉDITORIAL SPOTIFY
+
+⚠️ Disponible via Spotify for Artists, minimum 7 semaines avant sortie. Une seule chance par titre.
+
+━━━ CHAMPS À REMPLIR ━━━
+GENRE PRINCIPAL : [Afro Pop / R&B / Rap FR...]
+SOUS-GENRE : [Afrobeats / Soul / Trap...]
+CULTURE : [Francophone / Afrodiaspora...]
+MOOD : [Festif / Mélancolique / Motivant...]
+STYLE : [Dansant / Intimiste / Énergique...]
+INSTRUMENT CLEF : [808 / Guitare / Piano / Voix...]
+
+━━━ DESCRIPTION (500 caractères max) ━━━
+Structure conseillée :
+"[Nom artiste] revient avec [Titre], un titre [adjectif] qui [concept en 1 phrase]. Produit par [Producteur], ce son mêle [élément 1] et [élément 2] pour une ambiance [mood]. Parfait pour [contexte d'écoute : gym, soirée, route...]. [X]ème sortie de [Nom], après [Titre précédent] qui a cumulé [X]K streams."
+
+━━━ CONSEILS CLÉS ━━━
+→ Précis sur le mood et contexte d'écoute
+→ Cite des références si pertinent ("dans la veine de...")
+→ Mentionne l'actu (tournée, clip, collab connue)
+→ Pas de superlatifs vides ("banger absolu"...)
+→ Pitch en anglais si tu vises l'international
+→ Rappelle les stats si elles sont solides`},
+
+  {id:"email_booking_tpl",cat:"distrib",icon:"📩",titre:"Template Email Démarchage Salle",access:"all",
+   resume:"Structure d'un email de booking efficace pour démarcher une salle ou un festival.",
+   contenu:`TEMPLATE EMAIL BOOKING
+
+Objet : [NOM ARTISTE] – Demande de date – [Genre] – [Ville/Région]
+
+---
+
+Bonjour [Prénom programmateur si connu],
+
+Je me permets de vous contacter au sujet d'une possible date à [Nom de la salle].
+
+Je m'appelle [Nom d'artiste], artiste [genre] basé(e) à [ville]. Mon dernier projet "[Titre]" ([EP/Single], [mois année]) a [X]K streams sur Spotify et a été diffusé sur [radio / playlist]. [1 phrase sur l'univers artistique].
+
+Votre programmation m'attire particulièrement car [raison précise liée à la salle — ne pas généraliser]. Je me vois bien proposer [format du spectacle] à votre public.
+
+Mon EPK complet : [LIEN — jamais de pièce jointe]
+
+Je serais ravi(e) d'échanger sur une possible collaboration. Disponible pour la période [mois-mois XXXX].
+
+Bien cordialement,
+[Nom d'artiste]
+[Email] | [Tel] | [Lien Spotify]
+
+---
+
+💡 CONSEILS :
+→ Envoie le mardi ou mercredi matin
+→ Relance après 3 semaines sans réponse
+→ Personnalise CHAQUE email — les programmateurs le voient
+→ Le lien EPK en premier, jamais de pièce jointe`},
+
+  // ── FINANCEMENTS ──
+  {id:"fiche_cnm",cat:"finance",icon:"🏛️",titre:"Fiche Aides CNM",access:"all",
+   resume:"Centre National de la Musique — les principales aides disponibles pour artistes indépendants.",
+   contenu:`FICHE AIDES CNM — Centre National de la Musique
+Site : cnm.fr/aides
+
+━━━ PRODUCTION PHONOGRAPHIQUE ━━━
+Montant : jusqu'à 50 000 €
+Pour : production album/EP
+Eligible : producteurs indépendants avec SIRET
+Délai dossier : 4-6 mois
+Étapes : compte CNM + dossier artistique + dépôt avant date limite trimestrielle
+
+━━━ AIDE AU CLIP VIDÉO ━━━
+Montant : jusqu'à 15 000 €
+Pour : réalisation de clips
+Eligible : artistes et labels indépendants
+Délai : 2-3 mois
+Étapes : compte CNM + devis réalisateur + dépôt dossier
+
+━━━ AIDE AUX TOURNÉES ━━━
+Montant : variable
+Pour : tournées nationales
+Eligible : intermittents, associations
+Délai : 3-4 mois
+Étapes : planning confirmé + contrats de cession + dossier CNM
+
+━━━ AIDE AU DÉVELOPPEMENT EXPORT ━━━
+Pour : artistes visant les marchés internationaux
+Contact : Bureau Export (french-music.org)
+
+━━━ COMMENT POSTULER ━━━
+1. Crée ton compte sur cnm.fr
+2. Vérifie ton éligibilité (statut, type de projet)
+3. Prépare : dossier artistique, devis, planning, CV artistique
+4. Dépose avant la date limite trimestrielle (publiée sur le site)
+
+💡 Les aides CNM sont cumulables avec SACEM, ADAMI, DRAC.`},
+
+  {id:"fiche_adami",cat:"finance",icon:"🎤",titre:"Fiche ADAMI / SPEDIDAM",access:"all",
+   resume:"Aides pour artistes-interprètes : ADAMI (solistes) et SPEDIDAM (musiciens).",
+   contenu:`FICHE ADAMI & SPEDIDAM
+
+━━━ ADAMI (artistes-interprètes solistes) ━━━
+Site : adami.fr/artiste/aides-et-bourses
+Montant : 1 000 – 15 000 €
+Pour : album, tournée, clip
+Eligible : artistes-interprètes (chanteurs, comédiens...)
+Délai : 2-4 mois
+
+Aides disponibles :
+• Bourse Démo : financer un enregistrement démo
+• Aide à la production : album ou EP
+• Aide au spectacle vivant : soutien à la création scénique
+• Aide à la mobilité : frais de déplacement international
+
+Étapes : être artiste-interprète + dossier projet + soumission en ligne
+
+━━━ SPEDIDAM (musiciens interprètes) ━━━
+Site : spedidam.fr/aides
+Montant : 500 – 8 000 €
+Pour : album, studio, tournée
+Eligible : musiciens interprètes (instrumentistes...)
+Délai : 2-3 mois
+
+Aides disponibles :
+• Aide à l'enregistrement
+• Aide à la diffusion live
+• Aide à la formation
+
+Étapes : être musicien interprète + dossier artistique + dépôt en ligne
+
+💡 ADAMI et SPEDIDAM sont complémentaires — tu peux postuler aux deux si tu es à la fois chanteur et instrumentiste.`},
+
+  {id:"fiche_drac",cat:"finance",icon:"🗺️",titre:"Fiche Résidences & DRAC",access:"all",
+   resume:"Financements régionaux DRAC et résidences artistiques — studio gratuit et accompagnement.",
+   contenu:`FICHE DRAC & RÉSIDENCES ARTISTIQUES
+
+━━━ DRAC — Directions Régionales des Affaires Culturelles ━━━
+Site : culture.gouv.fr/Regions
+Montant : 1 000 – 20 000 €
+Pour : projets culturels ancrés régionalement
+Eligible : associations, intermittents avec ancrage territorial
+Délai : 3-5 mois
+
+Comment postuler :
+1. Contacte ta DRAC régionale (trouvable sur le site)
+2. Présente ton projet avec ancrage local fort
+3. Dossier artistique complet + budget prévisionnel
+4. Réponse sous 3-5 mois
+
+━━━ RÉSIDENCES ARTISTIQUES ━━━
+Site de référence : irma.asso.fr
+Montant : Studio gratuit + cachet 500-3 000 €
+Pour : création et développement artistique
+Eligible : tous statuts
+Appels : annuels (veille régulière nécessaire)
+
+Types de résidences :
+• Résidences de création : studio + temps pour créer
+• Résidences de diffusion : accompagnement de la tournée
+• Résidences pédagogiques : transmission + création
+
+Comment postuler :
+1. Veille sur irma.asso.fr et les scènes nationales
+2. Dossier artistique + démo + lettre de motivation personnalisée
+3. Délai de réponse : 1-3 mois
+
+💡 Les résidences offrent souvent hébergement + repas en plus du studio. Très précieux pour les émergents.`},
+
+  {id:"tpl_dossier",cat:"finance",icon:"📄",titre:"Template Dossier Subvention",access:"all",
+   resume:"Structure type d'un dossier de demande de subvention pour CNM, DRAC, SACEM.",
+   contenu:`TEMPLATE DOSSIER SUBVENTION
+
+━━━ PAGE DE GARDE ━━━
+Nom du porteur de projet : [Nom / Raison sociale]
+SIRET (si applicable) : [XXXXXXXXXXXXXXX]
+Contact : [Email] | [Tel]
+Nom du projet : [Titre du projet]
+Type de demande : [Production / Clip / Tournée / Résidence]
+Montant demandé : [XXXX] €
+Date de dépôt : [Date]
+
+━━━ 1. PRÉSENTATION ARTISTIQUE ━━━
+Biographie courte de l'artiste (150 mots max)
+Discographie / Historique de dates
+Éléments de presse (si disponibles)
+Liens : Spotify, site, EPK
+
+━━━ 2. DESCRIPTION DU PROJET ━━━
+Contexte : pourquoi ce projet, pourquoi maintenant
+Objectifs artistiques : ce que le projet va produire
+Objectifs de diffusion : public visé, territoire
+Calendrier prévisionnel : étape par étape
+
+━━━ 3. BUDGET PRÉVISIONNEL ━━━
+DÉPENSES
+• Studio / Production : [XX] €
+• Promotion / Vidéo : [XX] €
+• Logistique / Transport : [XX] €
+• Autres frais : [XX] €
+TOTAL DÉPENSES : [XX] €
+
+RECETTES
+• Autofinancement : [XX] €
+• Autres subventions demandées : [XX] €
+• Subvention [Organisme] demandée : [XX] €
+TOTAL RECETTES : [XX] €
+
+━━━ 4. ANNEXES ━━━
+[ ] Devis studio / prestataires
+[ ] Contrats signés (cession, booking)
+[ ] Extrait Kbis ou attestation URSSAF
+[ ] Relevé SACEM ou attestation adhésion
+
+💡 Sois précis sur les chiffres. Les comités vérifient la cohérence budget/projet.`},
+
+  // ── STATUTS ──
+  {id:"guide_ae",cat:"statuts",icon:"📋",titre:"Guide Auto-Entrepreneur Artiste",access:"all",
+   resume:"Tout pour créer ton statut auto-entrepreneur et facturer ton activité musicale légalement.",
+   contenu:`GUIDE AUTO-ENTREPRENEUR ARTISTE
+
+Site : autoentrepreneur.urssaf.fr
+Délai création : 48-72h | Gratuit
+
+━━━ POURQUOI CE STATUT ? ━━━
+→ Simple à créer, pas de comptable obligatoire
+→ Permet de facturer (concerts, cours, sessions studio)
+→ Protection sociale dès le premier euro déclaré
+→ Idéal pour démarrer avant de créer une société
+
+━━━ CODES APE POUR ARTISTES ━━━
+• 9001Z : Arts du spectacle vivant (concerts, live)
+• 5920Z : Enregistrement sonore et édition musicale (studio, production)
+Tu peux avoir les deux activités sous un même statut.
+
+━━━ ÉTAPES DE CRÉATION ━━━
+1. Va sur autoentrepreneur.urssaf.fr
+2. Clique "Créer mon auto-entreprise"
+3. Remplis : identité, activité (code APE), adresse
+4. Reçois ton SIRET sous 48-72h par email
+5. Commence à facturer !
+
+━━━ DÉCLARATIONS & COTISATIONS ━━━
+→ Déclare ton chiffre d'affaires mensuellement ou trimestriellement
+→ Taux de cotisation : ~22% du CA pour les services
+→ Si CA = 0 → cotisations = 0
+
+━━━ LIMITES DU STATUT ━━━
+→ Plafond CA : 77 700€/an (au-delà → autre statut)
+→ Pas de TVA récupérable en dessous du seuil
+→ Droits chômage limités (sauf si tu es aussi salarié)
+
+💡 Cumul possible avec l'intermittence si tu es éligible.`},
+
+  {id:"guide_intermittent",cat:"statuts",icon:"🎭",titre:"Guide Intermittent du Spectacle",access:"all",
+   resume:"Comment accéder au statut d'intermittent, conditions, droits et pièges à éviter.",
+   contenu:`GUIDE INTERMITTENT DU SPECTACLE
+
+━━━ C'EST QUOI ? ━━━
+Régime d'assurance chômage spécifique pour les artistes et techniciens du spectacle, permettant de percevoir des allocations entre les contrats.
+
+━━━ CONDITIONS D'ACCÈS ━━━
+→ 507 heures de travail salarié dans le spectacle en 12 mois (artiste)
+→ Contrats en CDD d'usage (CDDU) obligatoires
+→ Employeurs déclarant à Pôle Emploi Spectacle
+
+━━━ DROITS ━━━
+→ Allocations journalières entre les contrats
+→ Mutuelle pro (CMB — Caisse des Médias)
+→ Accès formation (AFDAS)
+→ Droits retraite spécifiques
+
+━━━ DOCUMENTS NÉCESSAIRES ━━━
+[ ] Bulletins de salaire (justifiant les 507h)
+[ ] Attestations employeurs
+[ ] Fiche d'état civil
+[ ] RIB
+
+━━━ PIÈGES À ÉVITER ━━━
+→ Ne pas confondre auto-entrepreneur et intermittent (incompatibles sur la même activité)
+→ Les cachets en association peuvent valider des heures
+→ Attention aux "faux cachets" — risque de redressement
+→ Renouveler ses droits avant la date d'anniversary
+
+━━━ RESSOURCES ━━━
+→ Pôle Emploi Spectacle : pole-emploi.fr
+→ Fédération des employeurs : fe-sps.fr
+→ CMB Mutuelle : cmb-sante.fr
+
+💡 Tu peux cumuler auto-entrepreneur ET intermittent si les activités sont bien séparées. Consulte un conseiller Pôle Emploi Spectacle.`},
+
+  {id:"guide_label",cat:"statuts",icon:"🏷️",titre:"Guide Création Label Indépendant",access:"all",
+   resume:"Créer une structure pour produire et distribuer ta musique professionnellement.",
+   contenu:`GUIDE CRÉATION LABEL INDÉPENDANT
+
+━━━ POURQUOI CRÉER UN LABEL ? ━━━
+→ Être propriétaire de tes masters (droits producteur)
+→ Obtenir un préfixe ISRC propre
+→ Signer d'autres artistes
+→ Accéder aux aides CNM réservées aux producteurs
+→ Crédibilité professionnelle
+
+━━━ ÉTAPE 1 : CHOISIR SON STATUT JURIDIQUE ━━━
+• Auto-entrepreneur : gratuit, rapide, mais limité (pas de TVA, plafond CA)
+• SASU / SAS : ~1500€ avec accompagnement, TVA récupérable, associés possibles
+• SARL : similaire, more adapté si plusieurs associés dès le départ
+→ Recommandation pour débuter : SASU
+
+━━━ ÉTAPE 2 : DÉPOSER LA MARQUE (INPI) ━━━
+Site : inpi.fr
+Coût : 290€ pour 10 ans et 1 classe
+Délai : 3-6 mois pour l'enregistrement définitif
+⚠️ Dépose AVANT d'en parler publiquement
+
+━━━ ÉTAPE 3 : CRÉER LA SOCIÉTÉ ━━━
+1. Rédiger les statuts (notaire ou en ligne via Legalstart)
+2. Déposer le capital (1€ minimum pour SAS)
+3. Publier une annonce légale (~150€)
+4. Déposer au greffe du tribunal de commerce
+5. Recevoir le Kbis
+
+━━━ ÉTAPE 4 : ADHÉRER À LA SCPP ━━━
+→ Pour obtenir ton préfixe ISRC de label
+→ Pour percevoir les droits voisins producteur
+→ Site : scpp.fr
+
+━━━ ÉTAPE 5 : OUVRIR UN COMPTE PRO ━━━
+→ Compte bancaire dédié obligatoire
+→ Options : Shine, Qonto, N26 Business (moins chers que les banques traditionnelles)
+
+💡 Budget total pour créer une SAS proprement : 2 000-3 000€ avec accompagnement.`},
+
+  // ── LIVE & TECHNIQUE ──
+  {id:"rider",cat:"live",icon:"🎛️",titre:"Template Rider Technique",access:"label",
+   resume:"Document technique à fournir aux salles : matériel requis, implantation scène, besoins son/lumière.",
+   contenu:`RIDER TECHNIQUE — [NOM D'ARTISTE / GROUPE]
+
+Contact technique : [Nom] | [Email] | [Tel]
+Mise à jour : [Date]
+
+━━━ CONFIGURATION SCÈNE ━━━
+Formation : [Solo / Duo / Trio / Groupe X personnes]
+Durée du set : [XX minutes]
+
+━━━ BESOINS SON ━━━
+SYSTÈME : Console numérique de préférence (Yamaha CL / Allen & Heath Avantis / Midas M32)
+MICROPHONES :
+• 1x micro chant (Shure SM58 ou equivalent)
+• [X]x micros instruments (préciser)
+DI BOXES : [X]x DI passives
+IN-EAR / RETOURS : [préciser préférence]
+
+LISTE DE CANAUX CONSOLE :
+1. Chant principal — Shure SM58
+2. Chant BV — [si applicable]
+3. Guitare — DI ou ampli micro
+4. Basse — DI
+5. Kick
+6. Caisse claire
+7. Overhead
+8. Clavier — DI stéréo
+[Adapter selon formation]
+
+━━━ BESOINS LUMIÈRE ━━━
+• Éclairage général de scène suffisant
+• [Effets spécifiques si applicable]
+• Contact lumière : [Oui/Non — rider lumière disponible sur demande]
+
+━━━ BACKLINE ━━━
+Fourni par l'artiste : [liste]
+Demandé à la salle : [liste — ampli guitare, batterie...]
+
+━━━ LOGES & ACCUEIL ━━━
+Nombre de personnes : [X]
+Riders hospitality : [eau, repas chaud, boissons — à négocier]
+
+━━━ SOUNDCHECK ━━━
+Durée souhaitée : [X] minutes
+Heure souhaitée : [X]h avant le concert
+
+Merci de confirmer réception et disponibilité du matériel.
+[Nom] | [Contact]`},
+
+  {id:"fiche_tech",cat:"live",icon:"📐",titre:"Template Fiche Technique Salle",access:"label",
+   resume:"Fiche à remplir pour chaque salle contactée : capacité, équipement, contacts.",
+   contenu:`TEMPLATE FICHE TECHNIQUE SALLE
+
+━━━ INFORMATIONS GÉNÉRALES ━━━
+Nom de la salle : ________________________________
+Adresse : ________________________________
+Ville : ________________________________
+Capacité (jauge) : _______ personnes
+Type : [ ] SMAC  [ ] Club  [ ] Salle privée  [ ] Festival
+
+━━━ CONTACTS ━━━
+Directeur / Directrice : ________________________________
+Programmateur(trice) : ________________________________
+Email programmation : ________________________________
+Téléphone : ________________________________
+Site web : ________________________________
+
+━━━ ÉQUIPEMENT TECHNIQUE ━━━
+Console son : ________________________________
+Système de diffusion : ________________________________
+Nombre de retours scène : ________
+In-ear monitoring disponible : [ ] Oui  [ ] Non
+Console lumières : ________________________________
+Backline disponible : [ ] Batterie  [ ] Ampli guitare  [ ] Ampli basse  [ ] Autre
+
+━━━ DIMENSIONS SCÈNE ━━━
+Largeur : _______ m | Profondeur : _______ m | Hauteur : _______ m
+
+━━━ CONDITIONS BOOKING ━━━
+Cachet minimum : _______ € | Cachet maximum : _______ €
+Type de contrat habituel : [ ] Cession  [ ] Coréalisation  [ ] Résidence
+Délai de réponse habituel : _______
+Meilleure période pour postuler : _______
+
+━━━ NOTES ━━━
+[Spécificités, conseils, historique de la relation avec la salle]`},
+];
+
+// --- LIENS ANNUAIRES EXTERNES -----------------------------------------------
+const ANNUAIRES_EXT = [
+  {id:"distrokid",   label:"DistroKid",        icon:"🎵", cat:"Distribution", desc:"Distribution streaming mondiale", url:AFF.distrokid,   color:"#1DB954"},
+  {id:"tunecore",    label:"TuneCore",          icon:"🎵", cat:"Distribution", desc:"Distribution avec contrôle total des droits", url:AFF.tunecore,    color:"#FF6B35"},
+  {id:"groover",     label:"Groover",            icon:"📻", cat:"Promotion",    desc:"Pitcher ta musique à des médias et playlists", url:AFF.groover,     color:"#845EF7"},
+  {id:"spotify_art", label:"Spotify for Artists",icon:"🟢", cat:"Promotion",    desc:"Stats, pitch éditorial, profil artiste", url:AFF.spotify,     color:"#1DB954"},
+  {id:"bandsintown", label:"Bandsintown",        icon:"📅", cat:"Booking",      desc:"Annonce tes concerts et contacte des bookers", url:AFF.bandsintown, color:"#00C9A7"},
+  {id:"sacem_site",  label:"SACEM",              icon:"🎼", cat:"Droits",       desc:"Déposer tes œuvres, percevoir tes droits", url:AFF.sacem,       color:"#845EF7"},
+  {id:"scpp_site",   label:"SCPP — ISRC",        icon:"🔢", cat:"Droits",       desc:"Obtenir tes codes ISRC", url:"https://www.scpp.fr", color:"#FFD43B"},
+  {id:"cnm_site",    label:"CNM",                icon:"🏛️", cat:"Financement",  desc:"Aides à la production, clip, tournée", url:AFF.cnm,         color:"#FF6B35"},
+  {id:"adami_site",  label:"ADAMI",              icon:"🎤", cat:"Financement",  desc:"Aides pour artistes-interprètes", url:AFF.adami,       color:"#F03E3E"},
+  {id:"spedidam_site",label:"SPEDIDAM",          icon:"🥁", cat:"Financement",  desc:"Aides pour musiciens interprètes", url:AFF.spedidam,    color:"#FFD43B"},
+  {id:"irma_site",   label:"IRMA",               icon:"🏠", cat:"Financement",  desc:"Résidences artistiques et ressources", url:AFF.irma,        color:"#C8A96E"},
+  {id:"kkbb_site",   label:"KissKissBankBank",   icon:"🤝", cat:"Financement",  desc:"Crowdfunding pour projets musicaux", url:AFF.kkbb,        color:"#F03E3E"},
+  {id:"inpi_site",   label:"INPI",               icon:"⚖️", cat:"Juridique",    desc:"Déposer ta marque / nom de label", url:"https://www.inpi.fr", color:"#00C9A7"},
+  {id:"urssaf_ae",   label:"URSSAF Auto-Entrepreneur",icon:"📋",cat:"Juridique", desc:"Créer ton statut auto-entrepreneur", url:"https://www.autoentrepreneur.urssaf.fr", color:"#00C9A7"},
+  {id:"ifcic_site",  label:"IFCIC",              icon:"🏦", cat:"Financement",  desc:"Garanties bancaires pour le secteur culturel", url:AFF.ifcic,       color:"#74C0FC"},
+];
 
 // --- RÉSEAU DATA --------------------------------------------------------------
 const ANNONCES_INIT = [
@@ -557,7 +1464,7 @@ function Gate({onUpgrade,label,features}){
           </div>
         ))}
       </div>
-      <button className="btn" style={{maxWidth:320}} onClick={onUpgrade}>S'abonner dès 9,99€/mois →</button>
+      <button className="btn" style={{maxWidth:320}} onClick={onUpgrade}>S'abonner dès 9,90€/mois →</button>
       <div style={{fontSize:10,color:"#888",letterSpacing:1}}>3 jours d'essai · Sans engagement · Résiliation en 1 clic</div>
     </div>
   );
@@ -834,6 +1741,105 @@ function Annuaire(){
   );
 }
 
+
+// --- BIBLIOTHÈQUE ------------------------------------------------------------
+function Bibliotheque({plan,goPlan}){
+  const [cat,setCat]=useState(null);
+  const [doc,setDoc]=useState(null);
+  const [copied,setCopied]=useState(false);
+  const [tabAnn,setTabAnn]=useState(false);
+
+  const canAccess=(d)=>plan==="label"||(plan==="artiste"&&d.access==="all");
+
+  const docsForCat=(catId)=>BIBLIO_DOCS.filter(d=>d.cat===catId);
+
+  if(doc){return(
+    <div style={{minHeight:"100vh",background:"#080808",color:"#F0EDE8",fontFamily:"'Inter',sans-serif",paddingBottom:80}}>
+      <Hdr sub="BIBLIOTHÈQUE" accent="#C8A96E" right={<button className="btn-o" style={{width:"auto",padding:"6px 12px",fontSize:10}} onClick={()=>setDoc(null)}>← Retour</button>}/>
+      <div style={{padding:"16px 18px 40px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+          <span style={{fontSize:24}}>{doc.icon}</span>
+          <div><div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:18,letterSpacing:2}}>{doc.titre}</div>
+          <span className="pill" style={{background:"#C8A96E15",color:"#C8A96E",border:"1px solid #C8A96E33",marginTop:4,display:"inline-flex"}}>{BIBLIO_CATS.find(c=>c.id===doc.cat)?.label}</span></div>
+        </div>
+        <div style={{background:"#0D0D0D",border:"1px solid #141414",borderRadius:8,padding:16,fontSize:11,lineHeight:1.9,color:"#BBB",whiteSpace:"pre-wrap",marginBottom:14,fontFamily:"monospace"}}>{doc.contenu}</div>
+        <div style={{display:"flex",gap:10}}>
+          <button style={{flex:1,background:"none",border:`1px solid ${copied?"#00C9A7":"#C8A96E44"}`,color:copied?"#00C9A7":"#C8A96E",fontFamily:"'Inter',sans-serif",fontSize:11,letterSpacing:2,padding:12,borderRadius:5,cursor:"pointer"}} onClick={()=>{navigator.clipboard.writeText(doc.contenu);setCopied(true);setTimeout(()=>setCopied(false),2500);}}>{copied?"✓ Copié !":"📋 Copier"}</button>
+        </div>
+      </div>
+    </div>
+  );}
+
+  return(
+    <div style={{minHeight:"100vh",background:"#080808",color:"#F0EDE8",fontFamily:"'Inter',sans-serif",paddingBottom:80}}>
+      <Hdr sub="BIBLIOTHÈQUE" accent="#C8A96E"/>
+      <div style={{display:"flex",borderBottom:"1px solid #111"}}>
+        <button className={`tab ${!tabAnn?"on":""}`} onClick={()=>setTabAnn(false)}>📚 Documents ({BIBLIO_DOCS.length})</button>
+        <button className={`tab ${tabAnn?"on":""}`} onClick={()=>setTabAnn(true)}>🔗 Annuaires ({ANNUAIRES_EXT.length})</button>
+      </div>
+
+      {!tabAnn&&(
+        <div style={{padding:"14px 18px"}}>
+          {plan==="free"&&<div style={{background:"#0D0D0D",border:"1px solid #C8A96E22",borderRadius:8,padding:"12px 14px",marginBottom:14,fontSize:11,color:"#888",lineHeight:1.7}}><span style={{color:"#C8A96E",fontSize:9,letterSpacing:2,display:"block",marginBottom:4}}>🔒 ACCÈS ABONNÉ</span>24 documents juridiques et pratiques rédigés pour les artistes indépendants.<button className="btn" style={{marginTop:10,background:"#C8A96E",color:"#000"}} onClick={goPlan}>Débloquer dès 9,90€/mois →</button></div>}
+          {plan==="artiste"&&<div style={{background:"#0D0D0D",border:"1px solid #FF6B3518",borderRadius:6,padding:"10px 12px",marginBottom:12,fontSize:10,color:"#888"}}><span style={{color:"#FF6B35"}}>✦ </span>Contrats avancés (cession, co-prod, licence, management, rider) réservés au plan Label — <button onClick={goPlan} style={{background:"none",border:"none",color:"#C8A96E",cursor:"pointer",fontFamily:"'Inter',sans-serif",fontSize:10,padding:0}}>Passer Label →</button></div>}
+          {BIBLIO_CATS.map(cat=>{
+            const docs=docsForCat(cat.id);
+            if(!docs.length)return null;
+            return(
+              <div key={cat.id} style={{marginBottom:20}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+                  <span style={{fontSize:16}}>{cat.icon}</span>
+                  <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,letterSpacing:2,color:cat.color}}>{cat.label.toUpperCase()}</div>
+                  <div style={{flex:1,height:1,background:"#111",marginLeft:8}}/>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {docs.map(d=>{
+                    const ok=canAccess(d);
+                    return(
+                      <div key={d.id} className="card" style={{padding:"12px 14px",opacity:ok?1:0.5,cursor:ok?"pointer":"not-allowed",borderColor:ok?`${cat.color}18`:"#111"}} onClick={()=>ok&&setDoc(d)}>
+                        <div style={{display:"flex",alignItems:"center",gap:10}}>
+                          <span style={{fontSize:18,flexShrink:0}}>{d.icon}</span>
+                          <div style={{flex:1}}>
+                            <div style={{fontSize:12,color:ok?"#DDD":"#555",fontWeight:500,marginBottom:3}}>{d.titre}</div>
+                            <div style={{fontSize:10,color:"#888",lineHeight:1.5}}>{d.resume}</div>
+                          </div>
+                          {ok?<span style={{color:cat.color,fontSize:16,flexShrink:0}}>›</span>:<span style={{fontSize:12,flexShrink:0}}>🔒</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {tabAnn&&(
+        <div style={{padding:"14px 18px"}}>
+          <div style={{background:"#0D0D0D",border:"1px solid #C8A96E18",borderRadius:8,padding:"10px 12px",marginBottom:14,fontSize:10,color:"#888"}}>Tous les liens utiles pour distribuer, promouvoir, financer et te structurer légalement.</div>
+          {["Distribution","Promotion","Booking","Droits","Financement","Juridique"].map(grp=>{
+            const items=ANNUAIRES_EXT.filter(a=>a.cat===grp);
+            if(!items.length)return null;
+            return(
+              <div key={grp} style={{marginBottom:18}}>
+                <div style={{fontSize:9,letterSpacing:2,color:"#555",marginBottom:8}}>{grp.toUpperCase()}</div>
+                {items.map(a=>(
+                  <a key={a.id} href={a.url} target="_blank" rel="noopener noreferrer" style={{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",background:"#0D0D0D",border:`1px solid ${a.color}15`,borderRadius:8,marginBottom:6,textDecoration:"none",cursor:"pointer"}}>
+                    <div style={{width:36,height:36,borderRadius:8,background:`${a.color}15`,border:`1px solid ${a.color}22`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>{a.icon}</div>
+                    <div style={{flex:1}}><div style={{fontSize:12,color:"#DDD",fontWeight:500}}>{a.label}</div><div style={{fontSize:10,color:"#888",marginTop:2}}>{a.desc}</div></div>
+                    <span style={{color:a.color,fontSize:14}}>↗</span>
+                  </a>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // --- SUBVENTIONS --------------------------------------------------------------
 function Subventions({plan,goPlan}){
   if(plan==="free"){
@@ -979,7 +1985,7 @@ function Actualites(){
   const search=async(q)=>{
     setLoading(true);setSearched(true);setQuery(q);
     try{
-      const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-haiku-4-5-20251001",max_tokens:1200,messages:[{role:"user",content:`Cherche les dernières actualités sur : "${q}" pour artistes musicaux indépendants en France. Retourne exactement 5 résultats en JSON valide, sans markdown ni backticks, format: [{"titre":"...","source":"...","date":"...","url":"...","resume":"...","categorie":"..."}]`}]})});
+      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-haiku-4-5-20251001",max_tokens:1200,tools:[{type:"web_search_20250305",name:"web_search"}],messages:[{role:"user",content:`Cherche les dernières actualités sur : "${q}" pour artistes musicaux indépendants en France. Retourne exactement 5 résultats en JSON valide, sans markdown ni backticks, format: [{"titre":"...","source":"...","date":"...","url":"...","resume":"...","categorie":"..."}]`}]})});
       const json=await res.json();const text=json.content?.filter(b=>b.type==="text").map(b=>b.text).join("")||"[]";const clean=text.replace(/```json|```/g,"").trim();
       try{setArticles(JSON.parse(clean));}catch{setArticles([]);}
     }catch{setArticles([]);}
@@ -1023,7 +2029,7 @@ function Profil({plan,setPlan,user,goPlan}){
       <Hdr sub="MON COMPTE"/>
       <div style={{padding:"20px 18px",display:"flex",flexDirection:"column",gap:14}}>
         <div className="card" style={{padding:18}}><div style={{fontSize:11,color:"#AAA",letterSpacing:1,fontWeight:600,marginBottom:10}}>PROFIL ARTISTE</div><div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,letterSpacing:3}}>{user?.name||"Artiste"}</div><div style={{fontSize:11,color:"#555",marginTop:2}}>{user?.genre||"Genre non défini"}</div></div>
-        <div className="card" style={{padding:18,borderColor:`${cur.c}22`}}><div style={{fontSize:11,color:"#AAA",letterSpacing:1,fontWeight:600,marginBottom:10}}>PLAN ACTUEL</div><div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><div><div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,letterSpacing:3,color:cur.c}}>{cur.l}</div><div style={{fontSize:10,color:"#999",marginTop:2}}>{plan==="free"?"Fonctionnalités limitées":plan==="artiste"?"4,99€ / mois":"24,99€ / mois"}</div></div><div style={{width:12,height:12,borderRadius:"50%",background:cur.c}}/></div>{plan!=="label"&&<button className="btn" style={{marginTop:14}} onClick={goPlan}>{plan==="free"?"Passer Pro →":"Passer Label →"}</button>}</div>
+        <div className="card" style={{padding:18,borderColor:`${cur.c}22`}}><div style={{fontSize:11,color:"#AAA",letterSpacing:1,fontWeight:600,marginBottom:10}}>PLAN ACTUEL</div><div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><div><div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,letterSpacing:3,color:cur.c}}>{cur.l}</div><div style={{fontSize:10,color:"#999",marginTop:2}}>{plan==="free"?"Essai 3 jours gratuits":plan==="artiste"?"9,90€ / mois — Fondateur":"29,90€ / mois — Fondateur"}</div></div><div style={{width:12,height:12,borderRadius:"50%",background:cur.c}}/></div>{plan!=="label"&&<button className="btn" style={{marginTop:14}} onClick={goPlan}>{plan==="free"?"Passer Pro →":"Passer Label →"}</button>}</div>
         <div style={{background:"#0A1A0A",border:"1px solid #00C9A722",borderRadius:8,padding:"12px 14px",fontSize:11,color:"#00C9A7",lineHeight:1.8}}><div style={{fontSize:9,letterSpacing:2,marginBottom:6}}>🧪 MODE TEST STRIPE</div><div style={{color:"#888",fontSize:11}}>Activez avec votre SIRET sur stripe.com.</div><div style={{marginTop:8,fontSize:10,color:"#00C9A755"}}>CB test : <strong>4242 4242 4242 4242</strong> · 12/26 · 123</div></div>
         <div className="card" style={{padding:16}}><div style={{fontSize:11,color:"#AAA",letterSpacing:1,fontWeight:600,marginBottom:12}}>SIMULER UN PLAN (DEMO)</div><div style={{display:"flex",gap:8}}>{["free","artiste","label"].map(p=><button key={p} onClick={()=>setPlan(p)} style={{flex:1,background:plan===p?"#FF6B3515":"#111",border:`1px solid ${plan===p?"#FF6B35":"#1A1A1A"}`,color:plan===p?"#FF6B35":"#555",fontFamily:"'Inter',sans-serif",fontSize:9,letterSpacing:1,padding:"8px",borderRadius:6,cursor:"pointer",textTransform:"uppercase"}}>{p}</button>)}</div></div>
       </div>
@@ -1124,11 +2130,11 @@ export default function INDYComplete() {
   const [showMore,setShowMore]=useState(false);
   const [showChat,setShowChat]=useState(false);
   const MORE_MENU=[
-    {id:"subventions",l:"Financement",i:"💰",c:"#F03E3E"},
-    {id:"annuaire",   l:"Annuaire",   i:"📚",c:"#C8A96E"},
-    {id:"reseau",     l:"Réseau",     i:"🤝",c:"#00C9A7"},
-    {id:"actualites", l:"Actualités", i:"📰",c:"#74C0FC"},
-    {id:"profil",     l:"Compte",     i:"👤",c:"#FF6B35"},
+    {id:"subventions", l:"Financement",i:"💰",c:"#F03E3E"},
+    {id:"bibliotheque",l:"Biblio",    i:"📚",c:"#C8A96E"},
+    {id:"annuaire",    l:"Annuaire",  i:"🗂️",c:"#FFD43B"},
+    {id:"reseau",      l:"Réseau",    i:"🤝",c:"#00C9A7"},
+    {id:"profil",      l:"Compte",    i:"👤",c:"#FF6B35"},
   ];
 
   if(screen==="landing")return(<div style={{background:"#060606",minHeight:"100vh"}}><style>{CSS}</style><Landing onEnter={()=>setScreen("onboarding")}/></div>);
@@ -1144,6 +2150,7 @@ export default function INDYComplete() {
         {view==="presskit"   &&<PressKit projects={projects} plan={plan} goPlan={goPlan}/>}
         {view==="booking"    &&<Booking plan={plan} goPlan={goPlan}/>}
         {view==="subventions"&&<Subventions plan={plan} goPlan={goPlan}/>}
+        {view==="bibliotheque"&&<Bibliotheque plan={plan} goPlan={goPlan}/>}
         {view==="annuaire"   &&<Annuaire/>}
         {view==="reseau"     &&<Reseau user={user}/>}
         {view==="actualites" &&<Actualites/>}
