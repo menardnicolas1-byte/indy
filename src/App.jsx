@@ -1468,7 +1468,7 @@ function Gate({onUpgrade,label,features}){
 // --- PRESS KIT ----------------------------------------------------------------
 function PressKit({projects,plan,goPlan}){
   const FMTS=[{id:"court",l:"Bio courte",i:"⚡",d:"~100 mots"},{id:"long",l:"Bio longue",i:"📰",d:"~300 mots"},{id:"email",l:"Email booking",i:"📩",d:"Prêt à envoyer"},{id:"spotify",l:"Pitch Spotify",i:"🎧",d:"Éditorial"}];
-  const [data,setData]=useState({});const [fmt,setFmt]=useState("court");const [phase,setPhase]=useState("form");const [result,setResult]=useState("");const [copied,setCopied]=useState(false);const [left,setLeft]=useState(plan==="free"?1:99);
+  const [data,setData]=useState({});const [fmt,setFmt]=useState("court");const [phase,setPhase]=useState("form");const [result,setResult]=useState("");const [copied,setCopied]=useState(false);const [left,setLeft]=useState(plan==="free"?0:99);
   const sf=FMTS.find(f=>f.id===fmt);
   if(plan==="free"){
     return(
@@ -1747,6 +1747,13 @@ function Bibliotheque({plan,goPlan}){
   const canAccess=(d)=>plan==="label"||(plan==="artiste"&&d.access==="all");
 
   const docsForCat=(catId)=>BIBLIO_DOCS.filter(d=>d.cat===catId);
+
+  if(plan==="free")return(
+    <div style={{minHeight:"100vh",background:"#080808",color:"#F0EDE8",fontFamily:"'Inter',sans-serif",paddingBottom:80}}>
+      <Hdr sub="BIBLIOTHEQUE" accent="#C8A96E"/>
+      <Gate onUpgrade={goPlan} label="Acces a 24 documents juridiques et pratiques rediges pour les artistes independants." features={["Contrats (featuring, split sheet)","Fiches SACEM & ISRC","Checklist sortie complete","Templates press kit & pitch Spotify","Fiches financement CNM, ADAMI","Guides statuts juridiques"]}/>
+    </div>
+  );
 
   if(doc){return(
     <div style={{minHeight:"100vh",background:"#080808",color:"#F0EDE8",fontFamily:"'Inter',sans-serif",paddingBottom:80}}>
@@ -2168,7 +2175,7 @@ export default function INDYComplete() {
 
       {/* Chatbot bouton flottant */}
       {!showChat&&(
-        <button onClick={()=>setShowChat(true)} style={{position:"fixed",bottom:76,right:16,width:52,height:52,borderRadius:"50%",background:plan!=="free"?"#FF6B35":"#1A1A1A",border:plan!=="free"?"none":"2px solid #2A2A2A",color:plan!=="free"?"#000":"#555",fontSize:22,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:49,boxShadow:plan!=="free"?"0 4px 20px #FF6B3544":"none",transition:"all 0.3s"}}>
+        <button onClick={()=>plan!=="free"&&setShowChat(true)} style={{position:"fixed",bottom:76,right:16,width:52,height:52,borderRadius:"50%",background:plan!=="free"?"#FF6B35":"#1A1A1A",border:plan!=="free"?"none":"2px solid #2A2A2A",color:plan!=="free"?"#000":"#333",fontSize:22,cursor:plan!=="free"?"pointer":"not-allowed",display:"flex",alignItems:"center",justifyContent:"center",zIndex:49,boxShadow:plan!=="free"?"0 4px 20px #FF6B3544":"none",transition:"all 0.3s",opacity:plan!=="free"?1:0.3}}>
           💬
         </button>
       )}
