@@ -1504,7 +1504,7 @@ return(
 }
 
 // ─── APP ROOT — état centralisé, navigation propre ───────────────────────────
-export default function INDYComplete(){
+export default function App(){
 // ── État global (1 seul endroit) ──────────────────────────────────────────
 const [screen,  setScreen]  = useState(“landing”);   // landing | auth | onboarding | paywall | app
 const [plan,    setPlan]    = useState(“free”);       // free | artiste | label
