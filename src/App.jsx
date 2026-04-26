@@ -253,6 +253,15 @@ const CSS = `
   @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
   @keyframes glow{0%,100%{box-shadow:0 0 20px #FF6B3515}50%{box-shadow:0 0 35px #FF6B3530}}
   @keyframes spin{to{transform:rotate(360deg)}}
+  /* Animations musicales */
+  @keyframes eqBar{0%,100%{transform:scaleY(0.25)}25%{transform:scaleY(0.85)}50%{transform:scaleY(0.45)}75%{transform:scaleY(1)}}
+  @keyframes wavePulse{0%{transform:scale(1);opacity:0.55}100%{transform:scale(2.4);opacity:0}}
+  @keyframes checkPop{0%{transform:scale(0.6) rotate(-12deg);opacity:0}55%{transform:scale(1.2) rotate(8deg);opacity:1}100%{transform:scale(1) rotate(0);opacity:1}}
+  @keyframes stepArrival{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:translateX(0)}}
+  @keyframes vinylSpin{to{transform:rotate(360deg)}}
+  .eq-bar{display:inline-block;width:3px;background:currentColor;border-radius:2px;transform-origin:bottom;animation:eqBar 1.1s ease-in-out infinite}
+  .check-pop{animation:checkPop 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards}
+  .step-fu{animation:stepArrival 0.35s ease forwards}
   .fu{animation:fadeUp 0.3s ease forwards}
   .fi{animation:fadeIn 0.25s ease forwards}
   .btn{background:linear-gradient(135deg,#FF6B35 0%,#FF8550 100%);border:none;color:#000;font-family:'Inter',sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:13px 20px;border-radius:8px;cursor:pointer;font-weight:500;transition:all 0.25s;width:100%;box-shadow:0 4px 14px #FF6B3530}
@@ -288,6 +297,20 @@ function Logo({size=70,anim=false}){
       <path d="M27 41 Q21 50 27 59" stroke="#FF6B35" strokeWidth="2.5" fill="none" strokeLinecap="round" opacity="0.65"/>
       <path d="M73 41 Q79 50 73 59" stroke="#845EF7" strokeWidth="2.5" fill="none" strokeLinecap="round" opacity="0.65"/>
     </svg>
+  );
+}
+
+// ─── EQUALIZER — mini barres animées (touche musicale visuelle) ──────────────
+// Usage : <Equalizer color="#FF6B35" bars={5} height={14} />
+// Les délais sont décalés pour donner un mouvement organique de barres audio.
+function Equalizer({color="#FF6B35",bars=5,height=14,active=true}){
+  const delays=[0,0.18,0.42,0.08,0.31,0.22,0.05]; // décalages pseudo-aléatoires
+  return(
+    <span style={{display:"inline-flex",alignItems:"flex-end",gap:2,height,color}} aria-hidden="true">
+      {Array.from({length:bars}).map((_,i)=>(
+        <span key={i} className="eq-bar" style={{height:"100%",animationDelay:`${delays[i%delays.length]}s`,animationPlayState:active?"running":"paused",opacity:active?1:0.35}}/>
+      ))}
+    </span>
   );
 }
 
@@ -347,8 +370,24 @@ function Auth({onSuccess, onBack}){
         const {data,error}=await sb.auth.signUp({email,password,options:{data:{name}}});
         if(error){setErr(error.message);setLoading(false);return;}
         if(data.user){
+          // Crée le profil
           await sb.from("profiles").upsert({id:data.user.id,email:data.user.email,name,plan:"free"});
-          onSuccess({id:data.user.id,email:data.user.email,name});
+          // Comme un trigger SQL auto-confirme les inscrits côté serveur,
+          // on peut directement faire un signIn pour ouvrir une session active.
+          // (Si la session n'est pas déjà ouverte par signUp, ce signIn la créera.)
+          if(!data.session){
+            const {data:signInData,error:signInErr}=await sb.auth.signInWithPassword({email,password});
+            if(signInErr){
+              // Si ça échoue (cas rare : l'auto-confirm trigger n'a pas encore tourné),
+              // on indique simplement que le compte est créé et on demande de se connecter.
+              setErr("Compte créé. Connecte-toi avec tes identifiants.");
+              setLoading(false);
+              return;
+            }
+            onSuccess({id:signInData.user.id,email:signInData.user.email,name});
+          } else {
+            onSuccess({id:data.user.id,email:data.user.email,name});
+          }
         }
       } else {
         const {data,error}=await sb.auth.signInWithPassword({email,password});
@@ -388,11 +427,17 @@ function Auth({onSuccess, onBack}){
 
 
 // ─── PAYWALL — unique composant d'accès ──────────────────────────────────────
-function Paywall({onSelect, current}){
+function Paywall({onSelect, current, user, onNeedAuth}){
   const [confirming,setConfirming]=useState(null); // plan en attente de confirmation paiement
 
   const choose=(plan)=>{
     if(plan.id==="free"){onSelect("free");return;}
+    // Si l'utilisateur est en mode "guest" (découverte sans compte),
+    // on lui demande de créer un compte AVANT d'aller au paiement.
+    if(!user||user.guest||!user.id){
+      if(onNeedAuth)onNeedAuth();
+      return;
+    }
     // Pour artiste/label : afficher modale de confirmation interne
     setConfirming(plan);
   };
@@ -408,42 +453,69 @@ function Paywall({onSelect, current}){
   const cancelPayment=()=>setConfirming(null);
   return(
     <div style={{minHeight:"100vh",background:"#080808",color:"#F0EDE8",fontFamily:"'Inter',sans-serif"}}>
-      <div style={{padding:"36px 24px 24px",textAlign:"center",borderBottom:"1px solid #111",position:"relative",overflow:"hidden"}}>
+      {/* Header compact (réduit pour laisser de la place aux plans) */}
+      <div style={{padding:"22px 24px 16px",textAlign:"center",borderBottom:"1px solid #111",position:"relative",overflow:"hidden"}}>
         <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at 50% 0%,#FF6B3510,transparent 65%)",pointerEvents:"none"}}/>
-        <Logo size={60} anim/>
-        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:46,letterSpacing:8,lineHeight:1,marginTop:14,color:"#FF6B35"}}>INDY</div>
-        <div style={{fontSize:9,color:"#555",letterSpacing:3,marginTop:4,marginBottom:14}}>SOIS INDY</div>
-        <div style={{fontSize:12,color:"#666",lineHeight:1.7,maxWidth:280,margin:"0 auto"}}>Le coach de poche de l'artiste indépendant. De la création à la scène.</div>
+        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:34,letterSpacing:6,lineHeight:1,color:"#FF6B35"}}>INDY</div>
+        <div style={{fontSize:9,color:"#555",letterSpacing:3,marginTop:4}}>CHOISIS TON PLAN</div>
       </div>
-      <div style={{padding:"18px 18px 100px",display:"flex",flexDirection:"column",gap:12}}>
-        <div style={{background:"linear-gradient(135deg,#0D0D0D 0%,#150E08 100%)",border:"1px solid #FF6B3533",borderRadius:10,padding:"12px 16px",display:"flex",alignItems:"center",gap:12,marginBottom:4}}>
-          <span style={{fontSize:18}}>🚀</span>
+
+      <div style={{padding:"14px 0 100px"}}>
+        {/* Bandeau fondateur compact */}
+        <div style={{margin:"0 18px 10px",background:"linear-gradient(135deg,#0D0D0D 0%,#150E08 100%)",border:"1px solid #FF6B3533",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:16}}>🚀</span>
           <div style={{flex:1}}>
-            <div style={{fontSize:9,color:"#FF6B35",letterSpacing:2,fontWeight:600}}>BETA · 200 MEMBRES FONDATEURS</div>
-            <div style={{fontSize:10,color:"#999",marginTop:2,lineHeight:1.4}}>Tarifs préférentiels à vie · Au-delà de 200 inscrits, prix standard appliqué</div>
+            <div style={{fontSize:9,color:"#FF6B35",letterSpacing:2,fontWeight:600}}>200 MEMBRES FONDATEURS</div>
+            <div style={{fontSize:10,color:"#999",marginTop:1,lineHeight:1.4}}>Tarifs préférentiels à vie</div>
           </div>
         </div>
-        {PLANS.map((plan,i)=>(
-          <div key={plan.id} className="card fu" style={{padding:20,animationDelay:`${i*0.07}s`,borderColor:plan.id===current?`${plan.color}55`:plan.id==="artiste"?"#FF6B3522":"#141414",animation:plan.id==="artiste"?"glow 3s ease-in-out infinite":undefined,position:"relative",overflow:"hidden"}}>
-            <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:plan.color,opacity:plan.id==="artiste"?1:0.3}}/>
-            {plan.badge&&<span className="pill" style={{position:"absolute",top:12,right:14,background:"#FF6B3518",color:"#FF6B35",border:"1px solid #FF6B3333"}}>{plan.badge}</span>}
-            {plan.id===current&&<span className="pill" style={{position:"absolute",top:12,right:14,background:"#00C9A718",color:"#00C9A7",border:"1px solid #00C9A733"}}>ACTUEL</span>}
-            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:18,letterSpacing:3,color:plan.color,marginBottom:4}}>{plan.name}</div>
-            <div style={{display:"flex",alignItems:"baseline",gap:2,marginBottom:6}}>
-              <span style={{fontSize:26,fontFamily:"'Bebas Neue',sans-serif"}}>{plan.price}</span>
-              <span style={{fontSize:11,color:"#999"}}>{plan.period}</span>
-              {plan.priceFutur&&<span style={{fontSize:10,color:"#888",textDecoration:"line-through",marginLeft:6}}>puis {plan.priceFutur}</span>}
-            </div>
-            {plan.priceFutur&&<div style={{fontSize:10,color:"#FF6B35",marginBottom:10,fontWeight:500}}>🔥 Tarif fondateur à vie (200 premiers membres) · 3 jours gratuits</div>}
-            {plan.labelInfo&&<div style={{background:`${plan.color}15`,border:`1px solid ${plan.color}33`,borderRadius:6,padding:"6px 10px",marginBottom:10,fontSize:10,color:plan.color,fontWeight:600}}>{plan.labelInfo}</div>}
-            {plan.features.map((f,fi)=><div key={fi} style={{display:"flex",gap:8,fontSize:11,color:"#888",padding:"4px 0"}}><span style={{color:plan.color,flexShrink:0}}>✓</span>{f}</div>)}
-            {plan.locked?.map((f,fi)=><div key={fi} style={{display:"flex",gap:8,fontSize:11,color:"#222",padding:"4px 0",textDecoration:"line-through"}}><span style={{flexShrink:0}}>✗</span>{f}</div>)}
-            <button className="btn" style={{marginTop:14,background:plan.color,color:"#000"}} onClick={()=>choose(plan)}>
-              {plan.id===current&&plan.id!=="free"?"Gérer mon abonnement":plan.cta}
-            </button>
+
+        {/* Bandeau guest si pas connecté */}
+        {(!user||user.guest||!user.id)&&(
+          <div style={{margin:"0 18px 10px",background:"#0A0A0A",border:"1px solid #1A1A1A",borderRadius:10,padding:"10px 13px",display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:13}}>👤</span>
+            <div style={{flex:1,fontSize:10.5,color:"#888",lineHeight:1.5}}>Mode découverte · création de compte demandée à l'abonnement (30 sec)</div>
           </div>
-        ))}
-        <div style={{fontSize:10,color:"#444",textAlign:"center",letterSpacing:1,marginTop:8}}>Résiliation possible à tout moment · Paiement sécurisé Stripe</div>
+        )}
+
+        {/* Indicateur swipe horizontal */}
+        <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:8,fontSize:9,color:"#666",letterSpacing:2,padding:"6px 0 10px",fontWeight:500}}>
+          <span style={{fontSize:11,animation:"float 2s ease-in-out infinite",display:"inline-block",transform:"rotate(-90deg)"}}>↓</span>
+          <span>3 PLANS · GLISSE POUR VOIR</span>
+          <span style={{fontSize:11,animation:"float 2s ease-in-out infinite",display:"inline-block",transform:"rotate(90deg)"}}>↓</span>
+        </div>
+
+        {/* Carrousel horizontal des 3 plans */}
+        <div style={{display:"flex",gap:12,overflowX:"auto",scrollSnapType:"x mandatory",WebkitOverflowScrolling:"touch",scrollbarWidth:"none",padding:"4px 18px 16px"}}>
+          {PLANS.map((plan,i)=>(
+            <div key={plan.id} className="card fu" style={{flexShrink:0,width:"calc(85vw - 18px)",maxWidth:340,padding:"18px 18px 16px",animationDelay:`${i*0.07}s`,borderColor:plan.id===current?`${plan.color}66`:`${plan.color}22`,animation:plan.id==="artiste"?"glow 3s ease-in-out infinite":undefined,position:"relative",overflow:"hidden",scrollSnapAlign:"center"}}>
+              <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:plan.color,opacity:plan.id==="free"?0.4:1}}/>
+              {plan.badge&&plan.id!==current&&<span className="pill" style={{position:"absolute",top:12,right:14,background:`${plan.color}22`,color:plan.color,border:`1px solid ${plan.color}55`,fontWeight:600}}>{plan.badge}</span>}
+              {plan.id===current&&<span className="pill" style={{position:"absolute",top:12,right:14,background:"#00C9A718",color:"#00C9A7",border:"1px solid #00C9A733"}}>ACTUEL</span>}
+              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:18,letterSpacing:3,color:plan.color,marginBottom:6,marginTop:4}}>{plan.name}</div>
+              <div style={{display:"flex",alignItems:"baseline",gap:3,marginBottom:4,flexWrap:"wrap"}}>
+                <span style={{fontSize:28,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1}}>{plan.price}</span>
+                <span style={{fontSize:11,color:"#999"}}>{plan.period}</span>
+              </div>
+              {plan.priceFutur&&<div style={{fontSize:10,color:plan.color,marginBottom:8,fontWeight:500,lineHeight:1.4}}>🔥 Prix fondateur · puis <span style={{textDecoration:"line-through",color:"#888"}}>{plan.priceFutur}</span></div>}
+              {plan.labelInfo&&<div style={{background:`${plan.color}15`,border:`1px solid ${plan.color}33`,borderRadius:6,padding:"6px 10px",marginBottom:10,fontSize:10,color:plan.color,fontWeight:600,lineHeight:1.4}}>{plan.labelInfo}</div>}
+              <div style={{borderTop:"1px solid #1A1A1A",margin:"8px 0",paddingTop:8}}>
+                {plan.features.map((f,fi)=><div key={fi} style={{display:"flex",gap:8,fontSize:11,color:"#AAA",padding:"3px 0",lineHeight:1.4}}><span style={{color:plan.color,flexShrink:0,fontWeight:700}}>✓</span><span>{f}</span></div>)}
+                {plan.locked?.map((f,fi)=><div key={fi} style={{display:"flex",gap:8,fontSize:11,color:"#333",padding:"3px 0",textDecoration:"line-through",lineHeight:1.4}}><span style={{flexShrink:0}}>✗</span><span>{f}</span></div>)}
+              </div>
+              <button className="btn" style={{marginTop:10,background:plan.color,color:plan.id==="free"?"#F0EDE8":"#000"}} onClick={()=>choose(plan)}>
+                {plan.id===current&&plan.id!=="free"?"Gérer mon abonnement":plan.cta}
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Indicateurs de pagination (3 points) */}
+        <div style={{display:"flex",justifyContent:"center",gap:6,marginBottom:10}}>
+          {PLANS.map(p=><span key={p.id} style={{width:6,height:6,borderRadius:"50%",background:p.color,opacity:0.4}}/>)}
+        </div>
+
+        <div style={{fontSize:10,color:"#444",textAlign:"center",letterSpacing:1,marginTop:8,padding:"0 18px"}}>Résiliation possible à tout moment · Paiement sécurisé Stripe</div>
       </div>
 
       {/* ── Modale de confirmation paiement ── */}
@@ -473,23 +545,23 @@ function Paywall({onSelect, current}){
 }
 
 // ─── LANDING ─────────────────────────────────────────────────────────────────
-function Landing({onEnter}){
+function Landing({onEnter, onLogin}){
   return(
     <div style={{minHeight:"100vh",background:"#060606",color:"#F0EDE8",fontFamily:"'Inter',sans-serif",display:"flex",flexDirection:"column",position:"relative",overflow:"hidden"}}>
       <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at 30% 20%,#FF6B3508,transparent 50%),radial-gradient(ellipse at 70% 80%,#845EF708,transparent 50%)",pointerEvents:"none"}}/>
-      <div style={{padding:"20px 24px",display:"flex",justifyContent:"space-between",position:"relative",zIndex:1}}>
+      <div style={{padding:"20px 24px",display:"flex",justifyContent:"space-between",alignItems:"center",position:"relative",zIndex:1}}>
         <div style={{fontSize:9,color:"#888",letterSpacing:3}}>BETA</div>
-        <div style={{fontSize:9,color:"#888",letterSpacing:2}}>FR · INDÉ · LIBRE</div>
+        <button onClick={onLogin} style={{background:"none",border:"1px solid #1F1F1F",color:"#888",fontFamily:"'Inter',sans-serif",fontSize:10,letterSpacing:2,padding:"7px 14px",borderRadius:20,cursor:"pointer",transition:"all 0.2s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor="#FF6B3555";e.currentTarget.style.color="#FF6B35";}} onMouseLeave={e=>{e.currentTarget.style.borderColor="#1F1F1F";e.currentTarget.style.color="#888";}}>SE CONNECTER</button>
       </div>
       <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"20px 28px",textAlign:"center",position:"relative",zIndex:1}}>
         <Logo size={130} anim/>
         <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:84,letterSpacing:20,lineHeight:1,marginTop:32,marginBottom:12,background:"linear-gradient(135deg,#F0EDE8 0%,#999 100%)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>INDY</div>
         <div style={{fontSize:11,color:"#FF6B35",letterSpacing:7,marginBottom:26,fontWeight:600}}>TON LABEL EN POCHE</div>
         <div style={{width:40,height:1,background:"#1F1F1F",marginBottom:22}}/>
-        <div style={{fontSize:28,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:5,color:"#F0EDE8",marginBottom:14}}>DEVIENS TA MAJOR</div>
+        <div style={{fontSize:28,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:5,color:"#F0EDE8",marginBottom:14}}>TON MANAGER DIGITAL</div>
         <div style={{fontSize:14,color:"#777",lineHeight:1.6,maxWidth:280,marginBottom:40,fontStyle:"italic"}}>Tout devient simple.</div>
-        <button className="btn" style={{width:"auto",padding:"18px 56px",fontSize:14,letterSpacing:3,borderRadius:30,boxShadow:"0 0 40px #FF6B3355"}} onClick={onEnter}>SOIS INDY →</button>
-        <div style={{fontSize:11,color:"#999",marginTop:18,letterSpacing:1}}>3 jours d'essai · Sans carte bancaire</div>
+        <button className="btn" style={{width:"auto",padding:"18px 56px",fontSize:14,letterSpacing:3,borderRadius:30,boxShadow:"0 0 40px #FF6B3355"}} onClick={onEnter}>DÉCOUVRIR INDY →</button>
+        <div style={{fontSize:11,color:"#999",marginTop:18,letterSpacing:1}}>Sans compte · Sans carte bancaire</div>
       </div>
       <div style={{padding:"14px 24px",textAlign:"center",fontSize:9,color:"#111",letterSpacing:2}}>WAKE UP MUSIC × INDY · 2025</div>
     </div>
@@ -530,6 +602,85 @@ function Onboarding({onDone}){
   );
 }
 
+// ─── HOW IT WORKS — module visuel du parcours INDY ───────────────────────────
+// Affiche les 6 étapes du parcours sous forme de "flow" connecté.
+// En mode découverte (0 projet), il prend toute la largeur avec une intro.
+// Avec des projets, il devient un bandeau compact rétractable.
+function HowItWorks({empty=false, onGoCoach, plan}){
+  const [open,setOpen]=useState(empty); // ouvert par défaut quand vide
+  const isFree=plan==="free";
+
+  return(
+    <div style={{margin:"14px 18px 0",background:"linear-gradient(135deg,#0D0D0D 0%,#0A0A0A 100%)",border:"1px solid #1A1A1A",borderRadius:12,overflow:"hidden",position:"relative"}}>
+      {/* Halo d'ambiance subtil */}
+      <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at 0% 0%,#FF6B3508,transparent 60%),radial-gradient(ellipse at 100% 100%,#845EF708,transparent 60%)",pointerEvents:"none"}}/>
+      {/* Header cliquable */}
+      <button onClick={()=>setOpen(o=>!o)} style={{width:"100%",background:"none",border:"none",padding:"13px 16px",display:"flex",alignItems:"center",gap:10,cursor:"pointer",position:"relative",zIndex:1}}>
+        <Equalizer color="#FF6B35" bars={4} height={12}/>
+        <span style={{fontSize:9,color:"#FF6B35",letterSpacing:2,fontWeight:600,fontFamily:"'Inter',sans-serif"}}>{empty?"BIENVENUE · COMMENT ÇA MARCHE":"COMMENT INDY T'ACCOMPAGNE"}</span>
+        <span style={{marginLeft:"auto",fontSize:11,color:"#666",transition:"transform 0.3s",transform:open?"rotate(180deg)":"rotate(0)"}}>▾</span>
+      </button>
+
+      {open&&(
+        <div className="fi" style={{padding:"4px 16px 16px",position:"relative",zIndex:1}}>
+          {empty&&(
+            <div style={{fontSize:13,color:"#CCC",lineHeight:1.6,marginBottom:14,fontFamily:"'Inter',sans-serif"}}>
+              INDY t'accompagne <strong style={{color:"#FF6B35"}}>de la création à la scène</strong> en 6 étapes.<br/>
+              <span style={{color:"#888",fontSize:12}}>Crée ton premier titre ci-dessous pour démarrer ton parcours.</span>
+            </div>
+          )}
+
+          {/* Flow horizontal des 6 étapes */}
+          <div style={{display:"flex",alignItems:"stretch",gap:0,overflowX:"auto",scrollbarWidth:"none",paddingBottom:6,marginLeft:-2,marginRight:-2}}>
+            {STAGES.map((s,i)=>(
+              <React.Fragment key={s.id}>
+                <div className="step-fu" style={{flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:6,minWidth:62,animationDelay:`${i*0.06}s`}}>
+                  <div style={{width:42,height:42,borderRadius:11,background:`${s.color}12`,border:`1.5px solid ${s.color}55`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:19,boxShadow:`0 2px 12px ${s.color}22`,transition:"all 0.25s"}}>
+                    {s.icon}
+                  </div>
+                  <div style={{fontSize:8,color:s.color,letterSpacing:1,fontFamily:"'Bebas Neue',sans-serif"}}>0{i+1}</div>
+                  <div style={{fontSize:10,color:"#AAA",fontWeight:500,textAlign:"center",lineHeight:1.2}}>{s.label}</div>
+                </div>
+                {i<STAGES.length-1&&(
+                  <div style={{flex:1,minWidth:14,display:"flex",alignItems:"center",justifyContent:"center",paddingTop:14}}>
+                    <div style={{height:1.5,background:`linear-gradient(90deg,${s.color}66,${STAGES[i+1].color}66)`,width:"100%",borderRadius:1}}/>
+                  </div>
+                )}
+              </React.Fragment>
+            ))}
+          </div>
+
+          {/* Description courte sous le flow */}
+          {empty&&(
+            <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginTop:14}}>
+              {[
+                {i:"🎯",t:"Coach pas à pas",d:"Des actions concrètes pour chaque étape"},
+                {i:"📚",t:"Bibliothèque",d:"Modèles pro, contrats, fiches techniques"},
+                {i:"📍",t:"Annuaire",d:"Salles, studios, résidences, tremplins"},
+                {i:"💰",t:"Subventions",d:"Aides et bourses pour ton projet"},
+              ].map((b,i)=>(
+                <div key={i} className="fu" style={{background:"#0A0A0A",border:"1px solid #141414",borderRadius:8,padding:"9px 11px",display:"flex",gap:8,alignItems:"center",animationDelay:`${0.15+i*0.05}s`}}>
+                  <span style={{fontSize:18,flexShrink:0}}>{b.i}</span>
+                  <div style={{minWidth:0}}>
+                    <div style={{fontSize:11,color:"#DDD",fontWeight:600,marginBottom:1}}>{b.t}</div>
+                    <div style={{fontSize:9.5,color:"#666",lineHeight:1.3}}>{b.d}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {empty&&isFree&&(
+            <div style={{marginTop:12,fontSize:10,color:"#666",textAlign:"center",lineHeight:1.5,letterSpacing:0.5}}>
+              💡 Tu es en mode <strong style={{color:"#999"}}>découverte</strong> · Parcours-le librement, l'abonnement débloque les fonctions IA, l'accès complet à l'annuaire et plus encore.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── DASHBOARD ───────────────────────────────────────────────────────────────
 function Dashboard({projects,setProjects,onGoCoach,onGoPlan,plan,user}){
   const [edit,setEdit]=useState(null);
@@ -551,6 +702,10 @@ function Dashboard({projects,setProjects,onGoCoach,onGoPlan,plan,user}){
           </div>
         ))}
       </div>
+
+      {/* ── MODULE VISUEL : Comment INDY t'accompagne ───────────────────────── */}
+      {/* Affiché toujours, mais en mode "découverte" élargi quand 0 projet */}
+      <HowItWorks empty={projects.length===0} onGoCoach={onGoCoach} plan={plan}/>
       {projects.length>0&&(
         <div style={{padding:"12px 18px 0"}}>
           <div style={{fontSize:9,color:"#555",letterSpacing:2,marginBottom:8}}>◆ AVANCEMENT PAR ÉTAPE</div>
@@ -765,12 +920,12 @@ function Coach({projects,setProjects,activeId,setActiveId,plan,onGoPlan}){
     <div style={{minHeight:"100vh",background:"#080808",color:"#F0EDE8",fontFamily:"'Inter',sans-serif",paddingBottom:80}}>
       <Hdr sub="COACH PARCOURS" onBack={si!==null?()=>{setSi(null);setTip(null);setShowGuide(false);}:undefined} right={projects.length>1&&<select value={proj.id} onChange={e=>setActiveId(e.target.value)} style={{background:"#111",border:"1px solid #1A1A1A",color:"#888",fontSize:11,padding:"6px 10px",borderRadius:6,width:"auto"}}>{projects.map(p=><option key={p.id} value={p.id}>{p.titre}</option>)}</select>}/>
 
-      {/* Bandeau projet actif */}
-      <div style={{padding:"10px 18px",borderBottom:"1px solid #111",display:"flex",alignItems:"center",gap:8}}>
-        <div style={{width:8,height:8,borderRadius:"50%",background:proj.color}}/>
-        <span style={{fontSize:11,color:"#CCC"}}>{proj.titre}</span>
+      {/* Bandeau projet actif — touche musicale : égaliseur animé */}
+      <div style={{padding:"10px 18px",borderBottom:"1px solid #111",display:"flex",alignItems:"center",gap:10,background:`linear-gradient(90deg,${proj.color}08,transparent 60%)`}}>
+        <Equalizer color={proj.color} bars={4} height={13} active={globalPct<100}/>
+        <span style={{fontSize:11,color:"#CCC",fontWeight:500}}>{proj.titre}</span>
         <span style={{fontSize:10,color:"#888"}}>· {proj.artiste}</span>
-        <span style={{marginLeft:"auto",fontSize:11,color:proj.color,fontFamily:"'Bebas Neue',sans-serif"}}>{globalPct}%</span>
+        <span style={{marginLeft:"auto",fontSize:13,color:globalPct===100?"#00C9A7":proj.color,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1}}>{globalPct}%</span>
       </div>
 
       {/* ── VUE 1 : ARBORESCENCE (par défaut) ──────────────────────────── */}
@@ -802,15 +957,18 @@ function Coach({projects,setProjects,activeId,setActiveId,plan,onGoPlan}){
             </div>
           )}
 
-          {/* Bouton manuel : Coup de boost IA */}
-          <button onClick={handleBoost} disabled={boostLoad} style={{width:"100%",background:plan==="free"?"#1A1A1A":"linear-gradient(135deg,#FF6B35,#FF8550)",border:plan==="free"?"1px solid #FF6B3533":"none",color:plan==="free"?"#FF6B35":"#000",fontFamily:"'Inter',sans-serif",fontSize:11,letterSpacing:2,textTransform:"uppercase",padding:"13px 20px",borderRadius:10,cursor:"pointer",fontWeight:600,marginBottom:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-            {boostLoad?<>⏳ Génération…</>:plan==="free"?<>🔒 ✦ Coup de boost Coach</>:<>✦ Coup de boost Coach</>}
+          {/* Bouton manuel : Coup de boost IA — touche ludique avec égaliseur en chargement */}
+          <button onClick={handleBoost} disabled={boostLoad} style={{width:"100%",background:plan==="free"?"#1A1A1A":"linear-gradient(135deg,#FF6B35,#FF8550)",border:plan==="free"?"1px solid #FF6B3533":"none",color:plan==="free"?"#FF6B35":"#000",fontFamily:"'Inter',sans-serif",fontSize:11,letterSpacing:2,textTransform:"uppercase",padding:"13px 20px",borderRadius:10,cursor:boostLoad?"wait":"pointer",fontWeight:600,marginBottom:14,display:"flex",alignItems:"center",justifyContent:"center",gap:10,boxShadow:plan==="free"?"none":"0 4px 18px #FF6B3540",transition:"all 0.25s"}}>
+            {boostLoad?<><Equalizer color="#000" bars={4} height={12}/> Le coach réfléchit…</>:plan==="free"?<>🔒 ✦ Coup de boost Coach</>:<>✦ Coup de boost Coach</>}
           </button>
           {boostMsg&&(
-            <div style={{background:"#0D0D0D",border:"1px solid #FF6B3533",borderRadius:10,padding:"14px 16px",marginBottom:16}}>
-              <div style={{fontSize:9,color:"#FF6B35",letterSpacing:2,marginBottom:8}}>💡 CONSEIL PERSONNALISÉ</div>
+            <div className="fu" style={{background:"linear-gradient(180deg,#0D0D0D,#0A0A0A)",border:"1px solid #FF6B3544",borderRadius:10,padding:"14px 16px",marginBottom:16,boxShadow:"0 4px 16px #FF6B3520"}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+                <Equalizer color="#FF6B35" bars={3} height={11}/>
+                <div style={{fontSize:9,color:"#FF6B35",letterSpacing:2,fontWeight:600}}>CONSEIL PERSONNALISÉ</div>
+              </div>
               <div style={{fontSize:12,color:"#CCC",lineHeight:1.7,whiteSpace:"pre-wrap"}}>{boostMsg}</div>
-              <button onClick={()=>setBoostMsg(null)} style={{background:"none",border:"none",color:"#666",fontSize:10,letterSpacing:1,padding:"8px 0 0",cursor:"pointer"}}>Fermer</button>
+              <button onClick={()=>setBoostMsg(null)} style={{background:"none",border:"none",color:"#666",fontSize:10,letterSpacing:1,padding:"10px 0 0",cursor:"pointer"}}>Fermer</button>
             </div>
           )}
 
@@ -821,23 +979,28 @@ function Coach({projects,setProjects,activeId,setActiveId,plan,onGoPlan}){
               const isComplete=s.pct===1;
               const isInProgress=s.pct>0&&s.pct<1;
               return(
-                <div key={s.id} className="card fu" style={{padding:0,overflow:"hidden",cursor:"pointer",animationDelay:`${i*0.04}s`,borderColor:isComplete?`${s.color}44`:isInProgress?`${s.color}22`:"#1A1A1A"}} onClick={()=>{setSi(i);setShowGuide(false);}}>
-                  <div style={{height:2,background:s.color,opacity:isComplete?1:isInProgress?0.6:0.2}}/>
+                <div key={s.id} className="card fu" style={{padding:0,overflow:"hidden",cursor:"pointer",animationDelay:`${i*0.05}s`,borderColor:isComplete?`${s.color}44`:isInProgress?`${s.color}33`:"#1A1A1A",position:"relative"}} onClick={()=>{setSi(i);setShowGuide(false);}}>
+                  <div style={{height:2,background:s.color,opacity:isComplete?1:isInProgress?0.7:0.18}}/>
+                  {/* Pastille pulsante pour l'étape en cours */}
+                  {isInProgress&&(
+                    <div style={{position:"absolute",top:8,right:10,width:6,height:6,borderRadius:"50%",background:s.color,boxShadow:`0 0 8px ${s.color}`,animation:"pulse 1.4s ease-in-out infinite"}}/>
+                  )}
                   <div style={{padding:"13px 14px",display:"flex",alignItems:"center",gap:12}}>
-                    <div style={{width:42,height:42,borderRadius:10,background:isComplete?`${s.color}22`:"#0D0D0D",border:`1.5px solid ${isComplete?s.color:isInProgress?s.color+"55":"#1A1A1A"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0,position:"relative"}}>
-                      {isComplete?"✓":s.icon}
+                    <div style={{width:42,height:42,borderRadius:10,background:isComplete?`${s.color}22`:isInProgress?`${s.color}10`:"#0D0D0D",border:`1.5px solid ${isComplete?s.color:isInProgress?s.color+"66":"#1A1A1A"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0,position:"relative",transition:"all 0.3s"}}>
+                      {isComplete?<span className="check-pop" style={{color:s.color,fontSize:18,fontWeight:700,display:"inline-block"}}>✓</span>:s.icon}
                     </div>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:4}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
                         <span style={{fontSize:9,color:s.color,opacity:0.6,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1}}>0{i+1}</span>
                         <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,letterSpacing:2,color:isComplete?s.color:"#F0EDE8"}}>{s.label.toUpperCase()}</span>
+                        {isInProgress&&<Equalizer color={s.color} bars={3} height={9}/>}
                       </div>
-                      <div style={{height:2,background:"#111",borderRadius:1,overflow:"hidden",marginBottom:4}}>
-                        <div style={{height:"100%",width:`${s.pct*100}%`,background:s.color,transition:"width 0.4s"}}/>
+                      <div style={{height:3,background:"#111",borderRadius:2,overflow:"hidden",marginBottom:4}}>
+                        <div style={{height:"100%",width:`${s.pct*100}%`,background:`linear-gradient(90deg,${s.color},${s.color}CC)`,transition:"width 0.5s ease",borderRadius:2}}/>
                       </div>
-                      <div style={{fontSize:10,color:"#666"}}>{s.done}/{s.total} actions {isComplete?<span style={{color:"#00C9A7",marginLeft:6}}>· terminé</span>:isInProgress?<span style={{color:s.color,marginLeft:6}}>· en cours</span>:<span style={{marginLeft:6}}>· à démarrer</span>}</div>
+                      <div style={{fontSize:10,color:"#666"}}>{s.done}/{s.total} actions {isComplete?<span style={{color:"#00C9A7",marginLeft:6}}>· terminé 🎉</span>:isInProgress?<span style={{color:s.color,marginLeft:6}}>· en cours</span>:<span style={{marginLeft:6}}>· à démarrer</span>}</div>
                     </div>
-                    <span style={{fontSize:18,color:"#333"}}>›</span>
+                    <span style={{fontSize:18,color:isInProgress?s.color:"#333",transition:"all 0.2s"}}>›</span>
                   </div>
                 </div>
               );
@@ -921,12 +1084,12 @@ function Coach({projects,setProjects,activeId,setActiveId,plan,onGoPlan}){
                 <div style={{background:"#0D0D0D",borderRadius:8,padding:"0 14px"}}>
                   {tasks.map((task,i)=>{const chk=!!checks[task.id];const showTip=tip===task.id;return(
                     <div key={task.id}>
-                      <div style={{display:"flex",alignItems:"flex-start",gap:12,padding:"13px 0",borderBottom:i<tasks.length-1?"1px solid #0F0F0F":"none"}}>
-                        <div onClick={()=>toggle(task.id)} style={{width:19,height:19,borderRadius:4,border:`1.5px solid ${chk?stage.color:"#2A2A2A"}`,background:chk?`${stage.color}18`:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1}}>{chk&&<span style={{fontSize:10,color:stage.color}}>✓</span>}</div>
-                        <div style={{flex:1,fontSize:12,color:chk?"#444":"#CCC",textDecoration:chk?"line-through":"none",lineHeight:1.5}}>{task.text}</div>
-                        <button onClick={e=>{e.stopPropagation();setTip(showTip?null:task.id);}} style={{background:"none",border:"none",color:"#2A2A2A",cursor:"pointer",fontSize:12,flexShrink:0}}>💡</button>
+                      <div style={{display:"flex",alignItems:"flex-start",gap:12,padding:"13px 0",borderBottom:i<tasks.length-1?"1px solid #0F0F0F":"none",transition:"all 0.2s"}}>
+                        <div onClick={()=>toggle(task.id)} style={{width:20,height:20,borderRadius:5,border:`1.5px solid ${chk?stage.color:"#2A2A2A"}`,background:chk?`${stage.color}22`:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1,transition:"all 0.2s",boxShadow:chk?`0 0 0 3px ${stage.color}10`:"none"}}>{chk&&<span className="check-pop" style={{fontSize:11,color:stage.color,fontWeight:700,display:"inline-block"}}>✓</span>}</div>
+                        <div style={{flex:1,fontSize:12,color:chk?"#444":"#CCC",textDecoration:chk?"line-through":"none",lineHeight:1.5,transition:"color 0.3s"}}>{task.text}</div>
+                        <button onClick={e=>{e.stopPropagation();setTip(showTip?null:task.id);}} style={{background:"none",border:"none",color:showTip?stage.color:"#2A2A2A",cursor:"pointer",fontSize:12,flexShrink:0,transition:"color 0.2s"}}>💡</button>
                       </div>
-                      {showTip&&<div style={{background:"#111",borderLeft:`2px solid ${stage.color}`,borderRadius:"0 7px 7px 0",padding:"10px 12px",marginBottom:6,fontSize:11,color:"#888",lineHeight:1.6}}>{task.tip}</div>}
+                      {showTip&&<div className="fu" style={{background:"#111",borderLeft:`2px solid ${stage.color}`,borderRadius:"0 7px 7px 0",padding:"10px 12px",marginBottom:6,fontSize:11,color:"#888",lineHeight:1.6}}>{task.tip}</div>}
                     </div>
                   );})}
                 </div>
@@ -1449,20 +1612,37 @@ function Actualites({onBack}){
 }
 
 // ─── PROFIL ──────────────────────────────────────────────────────────────────
-function Profil({plan,setPlan,user,onGoPlan,onBack}){
+function Profil({plan,setPlan,user,onGoPlan,onBack,onLogin}){
   const PI={free:{l:"DÉCOUVERTE",c:"#999"},artiste:{l:"ARTISTE",c:"#FF6B35"},label:{l:"LABEL",c:"#C8A96E"}};
   const cur=PI[plan];
   return(
     <div style={{minHeight:"100vh",background:"#080808",color:"#F0EDE8",fontFamily:"'Inter',sans-serif",paddingBottom:80}}>
       <Hdr sub="MON COMPTE" onBack={onBack}/>
       <div style={{padding:"20px 18px",display:"flex",flexDirection:"column",gap:14}}>
-        <div className="card" style={{padding:18}}><div style={{fontSize:11,color:"#AAA",letterSpacing:1,fontWeight:600,marginBottom:10}}>PROFIL ARTISTE</div><div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,letterSpacing:3}}>{user?.name||"Artiste"}</div><div style={{fontSize:11,color:"#555",marginTop:2}}>{user?.genre||"Genre non défini"}</div></div>
+        <div className="card" style={{padding:18}}>
+          <div style={{fontSize:11,color:"#AAA",letterSpacing:1,fontWeight:600,marginBottom:10}}>{user?.name?"PROFIL ARTISTE":"INVITÉ"}</div>
+          {user?.name?(
+            <>
+              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,letterSpacing:3}}>{user.name}</div>
+              <div style={{fontSize:11,color:"#555",marginTop:2}}>{user?.genre||"Genre non défini"}</div>
+            </>
+          ):(
+            <>
+              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,letterSpacing:3,color:"#888"}}>BIENVENUE 👋</div>
+              <div style={{fontSize:11,color:"#555",marginTop:4,lineHeight:1.5}}>Tu navigues en mode découverte. Crée un compte pour personnaliser ton profil et sauvegarder ton parcours.</div>
+            </>
+          )}
+        </div>
         <div className="card" style={{padding:18}}><div style={{fontSize:9,color:cur.c,letterSpacing:2,marginBottom:6}}>ABONNEMENT ACTUEL</div><div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:20,letterSpacing:3,color:cur.c}}>{cur.l}</div>{plan==="free"&&<button className="btn" style={{marginTop:12}} onClick={onGoPlan}>Passer à ARTISTE — 9,90€/mois →</button>}</div>
         {plan!=="free"&&<div className="card" style={{padding:18}}><div style={{fontSize:9,color:"#555",letterSpacing:2,marginBottom:10}}>GÉRER MON ABONNEMENT</div><button className="btn-o" style={{width:"100%",marginBottom:8}} onClick={onGoPlan}>Changer de plan</button><button className="btn-o" style={{width:"100%",color:"#F03E3E44",borderColor:"#F03E3E22"}} onClick={()=>setPlan("free")}>Résilier (simulation)</button></div>}
         <div className="card" style={{padding:18}}>
           <div style={{fontSize:9,color:"#555",letterSpacing:2,marginBottom:10}}>COMPTE</div>
           {user?.email&&<div style={{fontSize:11,color:"#888",marginBottom:10,wordBreak:"break-all"}}>{user.email}</div>}
-          <button className="btn-o" style={{width:"100%",color:"#666",borderColor:"#222"}} onClick={async()=>{if(!window.confirm("Te déconnecter de INDY ?"))return;if(supabase&&supabase.auth)await supabase.auth.signOut();window.location.reload();}}>Se déconnecter</button>
+          {(!user?.id||user?.guest)?(
+            <button className="btn" style={{width:"100%"}} onClick={onLogin||onGoPlan}>Créer un compte / Se connecter →</button>
+          ):(
+            <button className="btn-o" style={{width:"100%",color:"#666",borderColor:"#222"}} onClick={async()=>{if(!window.confirm("Te déconnecter de INDY ?"))return;if(supabase&&supabase.auth)await supabase.auth.signOut();window.location.reload();}}>Se déconnecter</button>
+          )}
         </div>
         <div className="card" style={{padding:18,textAlign:"center"}}>
           <div style={{fontSize:9,color:"#555",letterSpacing:2,marginBottom:12}}>QR CODE — PARTAGE INDY</div>
@@ -1566,59 +1746,94 @@ export default function App(){
   const [authReady,setAuthReady]= useState(false);  // true après tentative restore session
 
   // ── Persistance des projets (localStorage + Supabase si connecté) ─────────
+  // Note importante :
+  //  • la colonne `urgent` est BOOLEAN côté Supabase, mais en front c'est une
+  //    chaîne libre (ex: "Master à finir") → on stocke le détail dans le champ
+  //    `progress._urgent_text` (jsonb) et on dérive le booléen pour la table.
+  //  • la colonne `sortie` est DATE → on envoie null si la valeur est vide ou
+  //    invalide (sinon Postgres rejette l'upsert et tout le projet n'est pas sauvé).
   useEffect(()=>{
     try{localStorage.setItem("indy_projects",JSON.stringify(projects));}
     catch(e){console.warn("localStorage error",e);}
-    // Sync vers Supabase si connecté
-    if(supabase&&user?.id&&projects.length>0){
-      (async()=>{
-        try{
-          // Sauvegarder chaque projet dans la table projects
-          for(const p of projects){
-            await supabase.from("projects").upsert({
-              id: p.id,
-              user_id: user.id,
-              titre: p.titre,
-              artiste: p.artiste,
-              genre: p.genre,
-              stage: p.stage||"creation",
-              progress: p.progress||{},
-              checks: p.checks||{},
-              color: p.color,
-              sortie: p.sortie||null,
-              urgent: p.urgent||null,
-            },{onConflict:"id"});
-          }
-        }catch(e){console.warn("Supabase sync error",e);}
-      })();
-    }
-  },[projects]);
+    // Sync vers Supabase si connecté — debounce pour éviter le spam d'écritures
+    if(!(supabase&&user?.id&&projects.length>0))return;
+    const tid=setTimeout(async()=>{
+      try{
+        for(const p of projects){
+          // Validation date YYYY-MM-DD (sinon null)
+          const sortieValid=typeof p.sortie==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(p.sortie)?p.sortie:null;
+          // Le champ texte "urgent" est conservé dans progress (jsonb) pour ne pas le perdre
+          const progressWithMeta={...(p.progress||{}),_urgent_text:p.urgent||""};
+          const {error}=await supabase.from("projects").upsert({
+            id: p.id,
+            user_id: user.id,
+            titre: p.titre||"",
+            artiste: p.artiste||"",
+            genre: p.genre||"",
+            stage: p.stage||"creation",
+            progress: progressWithMeta,
+            checks: p.checks||{},
+            color: p.color||"#FF6B35",
+            sortie: sortieValid,
+            urgent: !!(p.urgent&&String(p.urgent).trim()),
+          },{onConflict:"id"});
+          if(error)console.warn("Supabase upsert error pour",p.titre,":",error.message);
+        }
+      }catch(e){console.warn("Supabase sync error",e);}
+    },600); // 600ms de debounce
+    return()=>clearTimeout(tid);
+  },[projects,user?.id]);
 
   // ── Charger les projets depuis Supabase au login ──────────────────────────
   useEffect(()=>{
     if(!supabase||!user?.id)return;
     (async()=>{
       try{
-        const {data}=await supabase.from("projects").select("*").eq("user_id",user.id);
+        const {data,error}=await supabase.from("projects").select("*").eq("user_id",user.id);
+        if(error){console.warn("Load projects error",error.message);return;}
         if(data&&data.length>0){
-          const loaded=data.map(p=>({
-            id:p.id,
-            titre:p.titre,
-            artiste:p.artiste,
-            genre:p.genre,
-            stage:p.stage||"creation",
-            progress:p.progress||{},
-            checks:p.checks||{},
-            color:p.color||"#FF6B35",
-            sortie:p.sortie||"",
-            urgent:p.urgent||"",
-          }));
+          const loaded=data.map(p=>{
+            // On récupère le texte d'urgence depuis progress._urgent_text si présent
+            const prog=p.progress||{};
+            const urgentText=prog._urgent_text||"";
+            const cleanProgress={...prog};delete cleanProgress._urgent_text;
+            return{
+              id:p.id,
+              titre:p.titre||"",
+              artiste:p.artiste||"",
+              genre:p.genre||"",
+              stage:p.stage||"creation",
+              progress:cleanProgress,
+              checks:p.checks||{},
+              color:p.color||"#FF6B35",
+              sortie:p.sortie||"",
+              urgent:urgentText,
+            };
+          });
           setProjects(loaded);
-          localStorage.setItem("indy_projects",JSON.stringify(loaded));
+          try{localStorage.setItem("indy_projects",JSON.stringify(loaded));}catch{}
         }
       }catch(e){console.warn("Load projects error",e);}
     })();
   },[user?.id]);
+
+  // ── Suppression côté Supabase quand un projet disparaît du state ──────────
+  // (le setProjects(ps=>ps.filter(...)) supprime du state mais pas de la DB)
+  const prevProjectIds=useRef([]);
+  useEffect(()=>{
+    if(!supabase||!user?.id){prevProjectIds.current=projects.map(p=>p.id);return;}
+    const currentIds=new Set(projects.map(p=>p.id));
+    const deletedIds=prevProjectIds.current.filter(id=>!currentIds.has(id));
+    if(deletedIds.length>0){
+      (async()=>{
+        for(const id of deletedIds){
+          try{await supabase.from("projects").delete().eq("id",id).eq("user_id",user.id);}
+          catch(e){console.warn("Delete error",e);}
+        }
+      })();
+    }
+    prevProjectIds.current=Array.from(currentIds);
+  },[projects,user?.id]);
 
   // ── Restauration session Supabase au chargement ───────────────────────────
   useEffect(()=>{
@@ -1666,7 +1881,7 @@ export default function App(){
     subventions: <Subventions  plan={plan} onGoPlan={goPaywall} onBack={goBack}/>,
     annuaire:    <Annuaire    plan={plan} onGoPlan={goPaywall} onBack={goBack}/>,
     actualites:  <Actualites   onBack={goBack}/>,
-    profil:      <Profil       plan={plan} setPlan={setPlan} user={user} onGoPlan={goPaywall} onBack={goBack}/>,
+    profil:      <Profil       plan={plan} setPlan={setPlan} user={user} onGoPlan={goPaywall} onBack={goBack} onLogin={()=>setScreen("auth")}/>,
   };
 
   const NAV=[
@@ -1688,10 +1903,16 @@ export default function App(){
   // Loader pendant la restauration de session
   if(!authReady) return <div style={{background:"#080808",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",color:"#FF6B35",fontFamily:"'Inter',sans-serif"}}><style>{CSS}</style><div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16}}><Logo size={60} anim/><div style={{fontSize:11,letterSpacing:3}}>CHARGEMENT…</div></div></div>;
 
-  if(screen==="landing")    return <div style={{background:"#060606",minHeight:"100vh"}}><style>{CSS}</style><Landing onEnter={()=>setScreen("auth")}/></div>;
-  if(screen==="auth")       return <div style={{background:"#080808",minHeight:"100vh"}}><style>{CSS}</style><Auth onBack={()=>setScreen("landing")} onSuccess={u=>{setUser(u);setPlan(u.plan||"free");setScreen(u.name?"paywall":"onboarding");}}/></div>;
-  if(screen==="onboarding") return <div style={{background:"#080808",minHeight:"100vh"}}><style>{CSS}</style><Onboarding onDone={async(u)=>{const merged={...user,...u};setUser(merged);if(supabase&&merged.id){try{await supabase.from("profiles").update({name:u.name,genre:u.genre}).eq("id",merged.id);}catch(e){console.warn(e);}}setScreen("paywall");}}/></div>;
-  if(screen==="paywall")    return <div style={{background:"#080808",minHeight:"100vh"}}><style>{CSS}</style><Paywall onSelect={async(p)=>{setPlan(p);if(supabase&&user?.id){try{await supabase.from("profiles").update({plan:p}).eq("id",user.id);}catch(e){console.warn(e);}}setScreen("app");}} current={plan}/></div>;
+  if(screen==="landing")    return <div style={{background:"#060606",minHeight:"100vh"}}><style>{CSS}</style><Landing onEnter={()=>{
+    // Entrée directe en mode découverte (pas de compte). On crée un user "guest" léger
+    // qui sera converti en vrai compte au moment de l'abonnement.
+    if(!user){setUser({id:null,email:null,name:"",guest:true});}
+    setPlan("free");
+    setScreen("app");
+  }} onLogin={()=>setScreen("auth")}/></div>;
+  if(screen==="auth")       return <div style={{background:"#080808",minHeight:"100vh"}}><style>{CSS}</style><Auth onBack={()=>setScreen(user?"app":"landing")} onSuccess={u=>{setUser(u);setPlan(u.plan||"free");setScreen(u.name?"app":"onboarding");}}/></div>;
+  if(screen==="onboarding") return <div style={{background:"#080808",minHeight:"100vh"}}><style>{CSS}</style><Onboarding onDone={async(u)=>{const merged={...user,...u};setUser(merged);if(supabase&&merged.id){try{await supabase.from("profiles").update({name:u.name,genre:u.genre}).eq("id",merged.id);}catch(e){console.warn(e);}}setScreen("app");}}/></div>;
+  if(screen==="paywall")    return <div style={{background:"#080808",minHeight:"100vh"}}><style>{CSS}</style><Paywall user={user} onNeedAuth={()=>setScreen("auth")} onSelect={async(p)=>{setPlan(p);if(supabase&&user?.id){try{await supabase.from("profiles").update({plan:p}).eq("id",user.id);}catch(e){console.warn(e);}}setScreen("app");}} current={plan}/></div>;
 
   return(
     <div style={{background:"#080808",minHeight:"100vh"}}>
