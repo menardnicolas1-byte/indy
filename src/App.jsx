@@ -34,6 +34,83 @@ const STRIPE = {
   label:   "https://buy.stripe.com/6oU6ozajx8NYbFO1u62Ji01",
 };
 
+// ─── PARTENAIRES & OUTILS ────────────────────────────────────────────────────
+// Pour ajouter tes liens d'affiliation plus tard :
+// remplace null par ton lien dans le champ `affiliate`.
+// Les partenaires avec affiliate:null s'affichent quand même (conseil neutre).
+const AFFILIATE_LINKS = {
+  distrokid: null,   // ex: "https://distrokid.com/vip/seven/XXXXXX"
+  tunecore:  null,   // ex: "https://www.tunecore.com/?via=XXXXXX"
+  landr:     null,   // ex: "https://www.landr.com/?ref=XXXXXX"
+};
+
+const PARTNERS = [
+  {
+    id:"distrokid", cat:"distribution",
+    nom:"DistroKid", logo:"🎵",
+    desc:"Le plus rapide et le moins cher. Titres illimités, paiements rapides. Idéal pour artistes solo actifs.",
+    prix:"22€/an", note:4.5, color:"#4A9EFF",
+    pour:["Sorties fréquentes","Artiste solo","Petit budget"],
+    site:"https://distrokid.com",
+    affiliate:AFFILIATE_LINKS.distrokid,
+  },
+  {
+    id:"tunecore", cat:"distribution",
+    nom:"TuneCore", logo:"🎶",
+    desc:"Solide et reconnu. Garde 100% de tes royalties. Bon support et reporting détaillé.",
+    prix:"14,99€/titre/an", note:4.2, color:"#FF6B35",
+    pour:["Artiste établi","Labels indie","Analytics poussées"],
+    site:"https://www.tunecore.com",
+    affiliate:AFFILIATE_LINKS.tunecore,
+  },
+  {
+    id:"believe", cat:"distribution",
+    nom:"Believe", logo:"🌍",
+    desc:"Distributeur français. Accompagnement humain, présence physique possible. Recommandé si tu veux un vrai partenaire.",
+    prix:"Sur candidature", note:4.3, color:"#00C9A7",
+    pour:["Projets ambitieux","Distribution physique","Label FR"],
+    site:"https://www.believe.com",
+    affiliate:null,
+  },
+  {
+    id:"ditto", cat:"distribution",
+    nom:"Ditto Music", logo:"📀",
+    desc:"Simple et efficace. Bon pour débuter sans se prendre la tête. Label services inclus.",
+    prix:"19€/an", note:3.9, color:"#845EF7",
+    pour:["Débutants","Groupes","Flexibilité"],
+    site:"https://www.dittomusic.com",
+    affiliate:null,
+  },
+  {
+    id:"amuse", cat:"distribution",
+    nom:"Amuse", logo:"🚀",
+    desc:"Freemium. Version gratuite pour tester, Pro pour des fonctions avancées. Application mobile.",
+    prix:"Gratuit / 24,99€/an Pro", note:3.8, color:"#FFD43B",
+    pour:["Test sans risque","Mobile first","Démarrage"],
+    site:"https://www.amuse.io",
+    affiliate:null,
+  },
+  {
+    id:"spotify_artists", cat:"outil",
+    nom:"Spotify for Artists", logo:"🎤",
+    desc:"Indispensable. Suis tes stats, crée ta bio, soumets au pitch éditorial Spotify. 100% gratuit.",
+    prix:"Gratuit", note:5, color:"#1DB954",
+    pour:["Tous les artistes","Stats live","Playlist pitch"],
+    site:"https://artists.spotify.com",
+    affiliate:null,
+    tuto:true, // Déclenche le tutoriel intégré
+  },
+  {
+    id:"landr", cat:"outil",
+    nom:"LANDR", logo:"✨",
+    desc:"Mastering IA en ligne. Résultat en quelques minutes. Indispensable si tu n'as pas de mastering engineer.",
+    prix:"Dès 9€/mois", note:4.1, color:"#C8A96E",
+    pour:["Mastering rapide","Budget serré","Indé"],
+    site:"https://www.landr.com",
+    affiliate:AFFILIATE_LINKS.landr,
+  },
+];
+
 // ─── PLANS ───────────────────────────────────────────────────────────────────
 const PLANS = [
   {
@@ -860,7 +937,7 @@ const STAGE_GUIDE = {
 };
 
 // ─── COACH ENRICHI ───────────────────────────────────────────────────────────
-function Coach({projects,setProjects,activeId,setActiveId,plan,onGoPlan}){
+function Coach({projects,setProjects,activeId,setActiveId,plan,onGoPlan,onGoOutils}){
   const [si,setSi]=useState(null); // null = vue arborescence ; 0-5 = étape sélectionnée
   const [tip,setTip]=useState(null);
   const [showGuide,setShowGuide]=useState(false);
@@ -1102,6 +1179,17 @@ function Coach({projects,setProjects,activeId,setActiveId,plan,onGoPlan}){
               {si<STAGES.length-1&&<button className="btn-o" style={{marginLeft:"auto"}} onClick={()=>{setSi(si+1);setTip(null);setShowGuide(false);}}>Suivant →</button>}
             </div>
           </div>
+        </div>
+      )}
+      {/* Bandeau Outils — affiché uniquement sur l'étape "Distribuer" */}
+      {stage&&stage.id==="distribution"&&(
+        <div className="fu" style={{margin:"0 18px 14px",background:"linear-gradient(135deg,#0D160D,#0A0A0F)",border:"1px solid #845EF733",borderRadius:10,padding:"13px 15px",display:"flex",alignItems:"center",gap:12}}>
+          <div style={{fontSize:24,flexShrink:0}}>🛠️</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:9,color:"#845EF7",letterSpacing:2,fontWeight:600,marginBottom:3}}>OUTILS RECOMMANDÉS</div>
+            <div style={{fontSize:11,color:"#888",lineHeight:1.5}}>Distributeurs, Spotify for Artists, LANDR… Retrouve la sélection INDY avec tutos inclus.</div>
+          </div>
+          <button onClick={onGoOutils} style={{flexShrink:0,background:"#845EF7",border:"none",color:"#FFF",fontFamily:"'Inter',sans-serif",fontSize:10,letterSpacing:1.5,fontWeight:600,padding:"9px 13px",borderRadius:8,cursor:"pointer",whiteSpace:"nowrap"}}>Voir →</button>
         </div>
       )}
       {showBoostToast&&<GateToast onUpgrade={onGoPlan}/>}
@@ -1611,6 +1699,184 @@ function Actualites({onBack}){
   );
 }
 
+// ─── OUTILS — page "Mes outils partenaires" ──────────────────────────────────
+function Outils({onBack}){
+  const [cat,setCat]=useState("tous");           // filtre actif
+  const [tuto,setTuto]=useState(false);          // mode tutoriel Spotify
+  const [tutoStep,setTutoStep]=useState(0);      // étape du tuto
+
+  const CATS=[
+    {id:"tous",    l:"Tous",          i:"🗂️"},
+    {id:"distribution",l:"Distrib.", i:"🚀"},
+    {id:"outil",   l:"Outils",       i:"✨"},
+  ];
+
+  const SPOTIFY_TUTO=[
+    {
+      titre:"Crée ton compte artiste",
+      emoji:"🎤",
+      contenu:"Va sur artists.spotify.com et clique sur « Revendiquer votre profil ». Tu as besoin d'avoir au moins un titre distribué et disponible sur Spotify.",
+      action:"Ouvrir Spotify for Artists",
+      lien:"https://artists.spotify.com",
+    },
+    {
+      titre:"Revendique ton profil",
+      emoji:"✅",
+      contenu:"Cherche ton nom d'artiste ou ton profil. Spotify va t'envoyer un code de vérification par email ou te demander une preuve via ton distributeur (DistroKid, Believe…).",
+      action:null,
+    },
+    {
+      titre:"Personnalise ta bio et ta photo",
+      emoji:"🖼️",
+      contenu:"Dans l'onglet « Profil », ajoute une photo d'artiste haute qualité (min 750x750px), une bio courte et percutante, et tes liens réseaux sociaux.",
+      action:null,
+    },
+    {
+      titre:"Suis tes stats en temps réel",
+      emoji:"📊",
+      contenu:"L'onglet « Accueil » montre tes streams du mois, tes auditeurs uniques, tes villes et pays les plus actifs. Check ça chaque semaine après une sortie.",
+      action:null,
+    },
+    {
+      titre:"Soumets aux playlists éditoriales",
+      emoji:"🎯",
+      contenu:"CRUCIAL. Dans « Pitch une chanson », soumets ton prochain titre AVANT sa sortie (minimum 7 jours). Les éditeurs Spotify écoutent chaque semaine. C'est gratuit et ça peut tout changer.",
+      action:null,
+    },
+    {
+      titre:"Active Spotify Canvas",
+      emoji:"🎬",
+      contenu:"Dans « Accueil » → « Canvas », ajoute une courte vidéo loopée (3-8 sec) sur chaque titre. Les titres avec Canvas ont +5% de streams en moyenne.",
+      action:null,
+    },
+  ];
+
+  const filtered=cat==="tous"?PARTNERS:PARTNERS.filter(p=>p.cat===cat);
+
+  if(tuto){
+    const step=SPOTIFY_TUTO[tutoStep];
+    return(
+      <div style={{minHeight:"100vh",background:"#080808",color:"#F0EDE8",fontFamily:"'Inter',sans-serif",display:"flex",flexDirection:"column"}}>
+        <Hdr sub="SPOTIFY FOR ARTISTS" accent="#1DB954" onBack={()=>{setTuto(false);setTutoStep(0);}}/>
+        <div style={{flex:1,padding:"20px 18px 100px"}}>
+          {/* Barre de progression */}
+          <div style={{display:"flex",gap:4,marginBottom:24}}>
+            {SPOTIFY_TUTO.map((_,i)=>(
+              <div key={i} style={{flex:1,height:3,borderRadius:2,background:i<=tutoStep?"#1DB954":"#1A1A1A",transition:"background 0.3s"}}/>
+            ))}
+          </div>
+          <div className="fu" style={{textAlign:"center",marginBottom:28}}>
+            <div style={{fontSize:56,marginBottom:12}}>{step.emoji}</div>
+            <div style={{fontSize:9,color:"#1DB954",letterSpacing:3,marginBottom:8,fontWeight:600}}>ÉTAPE {tutoStep+1} / {SPOTIFY_TUTO.length}</div>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,letterSpacing:3,marginBottom:16,lineHeight:1.2}}>{step.titre.toUpperCase()}</div>
+            <div style={{fontSize:13,color:"#AAA",lineHeight:1.7,maxWidth:320,margin:"0 auto"}}>{step.contenu}</div>
+          </div>
+          {step.action&&(
+            <a href={step.lien} target="_blank" rel="noopener noreferrer" style={{display:"block",background:"#1DB954",color:"#000",fontFamily:"'Inter',sans-serif",fontSize:11,letterSpacing:2,fontWeight:700,textAlign:"center",padding:"14px 20px",borderRadius:10,textDecoration:"none",marginBottom:16}}>
+              {step.action} ↗
+            </a>
+          )}
+          <div style={{display:"flex",gap:10,marginTop:8}}>
+            {tutoStep>0&&(
+              <button onClick={()=>setTutoStep(s=>s-1)} className="btn-o" style={{flex:1}}>← Précédent</button>
+            )}
+            {tutoStep<SPOTIFY_TUTO.length-1?(
+              <button onClick={()=>setTutoStep(s=>s+1)} className="btn" style={{flex:1,background:"#1DB954",color:"#000"}}>Suivant →</button>
+            ):(
+              <button onClick={()=>{setTuto(false);setTutoStep(0);}} className="btn" style={{flex:1,background:"#1DB954",color:"#000"}}>✓ Terminé !</button>
+            )}
+          </div>
+          {/* Conseil bonus en fin de tuto */}
+          {tutoStep===SPOTIFY_TUTO.length-1&&(
+            <div className="fu" style={{marginTop:16,background:"#0D160E",border:"1px solid #1DB95433",borderRadius:10,padding:"14px 16px"}}>
+              <div style={{fontSize:9,color:"#1DB954",letterSpacing:2,marginBottom:6,fontWeight:600}}>💡 CONSEIL INDY</div>
+              <div style={{fontSize:12,color:"#AAA",lineHeight:1.6}}>Planifie un pitch Spotify AVANT chaque sortie. Intègre cette étape dans ton Coach → étape Distribuer pour ne jamais l'oublier.</div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return(
+    <div style={{minHeight:"100vh",background:"#080808",color:"#F0EDE8",fontFamily:"'Inter',sans-serif",display:"flex",flexDirection:"column"}}>
+      <Hdr sub="MES OUTILS" accent="#845EF7" onBack={onBack}/>
+      <div style={{flex:1,padding:"14px 18px 100px"}}>
+        {/* Intro */}
+        <div style={{background:"linear-gradient(135deg,#0D0D0D,#0A0A0A)",border:"1px solid #1A1A1A",borderRadius:10,padding:"13px 16px",marginBottom:14,display:"flex",gap:12,alignItems:"flex-start"}}>
+          <span style={{fontSize:20}}>🛠️</span>
+          <div>
+            <div style={{fontSize:11,color:"#DDD",fontWeight:600,marginBottom:4}}>Sélection INDY</div>
+            <div style={{fontSize:11,color:"#666",lineHeight:1.6}}>Outils et distributeurs sélectionnés pour les artistes indépendants français. Conseil neutre — les liens marqués <span style={{color:"#FF6B35"}}>★</span> incluent un avantage partenaire.</div>
+          </div>
+        </div>
+
+        {/* Filtre catégories */}
+        <div style={{display:"flex",gap:8,marginBottom:16,overflowX:"auto",scrollbarWidth:"none",paddingBottom:2}}>
+          {CATS.map(c=>(
+            <button key={c.id} onClick={()=>setCat(c.id)} style={{flexShrink:0,background:cat===c.id?"#FF6B35":"#111",border:`1px solid ${cat===c.id?"#FF6B35":"#222"}`,color:cat===c.id?"#000":"#888",fontFamily:"'Inter',sans-serif",fontSize:10,letterSpacing:1.5,padding:"7px 14px",borderRadius:20,cursor:"pointer",fontWeight:cat===c.id?700:400,transition:"all 0.2s"}}>
+              {c.i} {c.l.toUpperCase()}
+            </button>
+          ))}
+        </div>
+
+        {/* Liste des outils */}
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {filtered.map((p,i)=>(
+            <div key={p.id} className="card fu" style={{padding:0,overflow:"hidden",animationDelay:`${i*0.05}s`,borderColor:`${p.color}22`}}>
+              <div style={{height:2,background:p.color}}/>
+              <div style={{padding:"14px 16px"}}>
+                {/* Header outil */}
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                  <div style={{width:40,height:40,borderRadius:10,background:`${p.color}18`,border:`1px solid ${p.color}44`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{p.logo}</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:16,letterSpacing:2,color:p.color}}>{p.nom}</span>
+                      {p.affiliate&&<span style={{fontSize:9,color:"#FF6B35",background:"#FF6B3515",border:"1px solid #FF6B3533",borderRadius:4,padding:"1px 5px",letterSpacing:1}}>★ PARTENAIRE</span>}
+                      {p.tuto&&<span style={{fontSize:9,color:"#1DB954",background:"#1DB95415",border:"1px solid #1DB95433",borderRadius:4,padding:"1px 5px",letterSpacing:1}}>TUTO INCLUS</span>}
+                    </div>
+                    <div style={{fontSize:10,color:"#888",marginTop:1}}>{p.prix}</div>
+                  </div>
+                  {/* Étoiles */}
+                  <div style={{fontSize:10,color:p.color,flexShrink:0}}>{"★".repeat(Math.round(p.note))}{"☆".repeat(5-Math.round(p.note))}</div>
+                </div>
+
+                {/* Description */}
+                <div style={{fontSize:12,color:"#AAA",lineHeight:1.6,marginBottom:10}}>{p.desc}</div>
+
+                {/* Tags "Pour qui" */}
+                <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:12}}>
+                  {p.pour.map((tag,ti)=>(
+                    <span key={ti} style={{fontSize:9,color:p.color,background:`${p.color}12`,border:`1px solid ${p.color}33`,borderRadius:4,padding:"2px 7px",letterSpacing:0.5}}>{tag}</span>
+                  ))}
+                </div>
+
+                {/* Boutons d'action */}
+                <div style={{display:"flex",gap:8}}>
+                  {p.tuto?(
+                    <button onClick={()=>setTuto(true)} className="btn" style={{flex:1,background:"#1DB954",color:"#000",fontSize:11,letterSpacing:1.5}}>
+                      📖 Tutoriel pas à pas
+                    </button>
+                  ):(
+                    <a href={p.affiliate||p.site} target="_blank" rel="noopener noreferrer" style={{flex:1,background:p.affiliate?p.color:"#111",color:p.affiliate?"#000":"#888",border:p.affiliate?`1px solid ${p.color}`:"1px solid #222",fontFamily:"'Inter',sans-serif",fontSize:11,letterSpacing:1.5,fontWeight:p.affiliate?700:400,textAlign:"center",padding:"12px 16px",borderRadius:8,textDecoration:"none",display:"block",transition:"all 0.2s"}}>
+                      {p.affiliate?"Essayer ★ ↗":"Voir le site ↗"}
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Bloc "Tu as un lien d'affiliation ?" */}
+        <div style={{marginTop:16,background:"#0A0A0A",border:"1px dashed #333",borderRadius:10,padding:"13px 16px",textAlign:"center"}}>
+          <div style={{fontSize:11,color:"#555",lineHeight:1.6}}>Tu distribuais déjà via DistroKid ou TuneCore ?<br/>Ajoute ton lien de parrainage dans le code pour qu'on l'intègre ici automatiquement.</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── PROFIL ──────────────────────────────────────────────────────────────────
 function Profil({plan,setPlan,user,onGoPlan,onBack,onLogin}){
   const PI={free:{l:"DÉCOUVERTE",c:"#999"},artiste:{l:"ARTISTE",c:"#FF6B35"},label:{l:"LABEL",c:"#C8A96E"}};
@@ -1874,13 +2140,14 @@ export default function App(){
   // ── Contenu principal ─────────────────────────────────────────────────────
   const VIEWS = {
     dashboard:   <Dashboard    projects={projects} setProjects={setProjects} onGoCoach={goCoach} onGoPlan={goPaywall} plan={plan} user={user}/>,
-    coach:       <Coach        projects={projects} setProjects={setProjects} activeId={activeId} setActiveId={setActiveId} plan={plan} onGoPlan={goPaywall}/>,
+    coach:       <Coach        projects={projects} setProjects={setProjects} activeId={activeId} setActiveId={setActiveId} plan={plan} onGoPlan={goPaywall} onGoOutils={()=>goTo("outils")}/>,
     presskit:    <PressKit     projects={projects} plan={plan} onGoPlan={goPaywall} onBack={goBack}/>,
     booking:     <Booking      plan={plan} onGoPlan={goPaywall} onBack={goBack}/>,
     bibliotheque:<Bibliotheque plan={plan} onGoPlan={goPaywall} onBack={goBack}/>,
     subventions: <Subventions  plan={plan} onGoPlan={goPaywall} onBack={goBack}/>,
-    annuaire:    <Annuaire    plan={plan} onGoPlan={goPaywall} onBack={goBack}/>,
+    annuaire:    <Annuaire     plan={plan} onGoPlan={goPaywall} onBack={goBack}/>,
     actualites:  <Actualites   onBack={goBack}/>,
+    outils:      <Outils       onBack={goBack}/>,
     profil:      <Profil       plan={plan} setPlan={setPlan} user={user} onGoPlan={goPaywall} onBack={goBack} onLogin={()=>setScreen("auth")}/>,
   };
 
@@ -1892,11 +2159,12 @@ export default function App(){
     {id:"more",     l:"Plus",     i:"+"},
   ];
   const MORE_MENU=[
-    {id:"bibliotheque",l:"Documents", i:"📚",c:"#C8A96E"},
+    {id:"bibliotheque",l:"Documents",  i:"📚",c:"#C8A96E"},
     {id:"subventions", l:"Financement",i:"💰",c:"#F03E3E"},
-    {id:"annuaire",    l:"Annuaire",  i:"🗂️",c:"#845EF7"},
-    {id:"actualites",  l:"Actualités",i:"📰",c:"#74C0FC"},
-    {id:"profil",      l:"Compte",    i:"👤",c:"#FF6B35"},
+    {id:"annuaire",    l:"Annuaire",   i:"🗂️",c:"#845EF7"},
+    {id:"outils",      l:"Mes outils", i:"🛠️",c:"#1DB954"},
+    {id:"actualites",  l:"Actualités", i:"📰",c:"#74C0FC"},
+    {id:"profil",      l:"Compte",     i:"👤",c:"#FF6B35"},
   ];
 
   // ── Écrans ────────────────────────────────────────────────────────────────
